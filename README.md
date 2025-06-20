@@ -1,46 +1,55 @@
-# Agentic Platform - OpenCTI GraphQL MCP Server
+# Agentic Platform - MCP Servers Collection
 
-This MCP (Machine Control Protocol) server provides a set of tools to interact with OpenCTI's GraphQL API. It allows you to query and manipulate data in OpenCTI through a standardized interface.
+This repository contains a collection of MCP (Machine Control Protocol) servers designed to interact with various services and APIs. Each server provides specific tools and capabilities for different platforms.
 
-## Features
+## Available MCP Servers
+
+### 1. OpenCTI GraphQL Filigran Server
+
+A server that provides tools to interact with OpenCTI's GraphQL API, allowing you to query and manipulate data in OpenCTI through a standardized interface.
+
+#### Features
 
 - List available GraphQL types
 - Get detailed type definitions
 - Execute custom GraphQL queries
 - Get STIX relationships mapping between types
 
-## Prerequisites
+#### Prerequisites
 
 - Python 3.7+
 - Access to an OpenCTI instance
 - OpenCTI API token
 
-## Environment Variables
+#### Environment Variables
 
-The server requires the following environment variables:
+The OpenCTI server requires the following environment variables:
 
 - `OPENCTI_URL`: The URL of your OpenCTI GraphQL endpoint
 - `OPENCTI_TOKEN`: Your OpenCTI API token
 
-## Installation
+
+#### Installation
 
 1. Clone the repository:
 ```bash
 git clone https://github.com/yourusername/agentic_platform.git
-cd agentic_platform
+cd agentic_platform/src/mcp_server/opencti_graphql_filigran
 ```
 
-2. Install dependencies:
+2. Install dependencies for the specific server you want to use:
 ```bash
-pip install -r src/mcp_server/requirements.txt
+pip install -r requirements.txt
 ```
 
-## Usage
+
+
+#### Usage
 
 You can run the server using Python directly:
 
 ```bash
-python src/mcp_server/opencti_graphql.py
+python opencti_graphql_filigran.py
 ```
 
 Or configure it in your application with these parameters:
@@ -48,7 +57,7 @@ Or configure it in your application with these parameters:
 ```json
 {
     "command": "python",
-    "args": ["src/mcp_server/opencti_graphql.py"],
+    "args": ["<path_of_script>/opencti_graphql_filigran.py"],
     "env": {
         "OPENCTI_URL": "<url_graphql>",
         "OPENCTI_TOKEN": "<token_graphql>"
@@ -56,7 +65,7 @@ Or configure it in your application with these parameters:
 }
 ```
 
-## Available Tools
+#### Available Tools
 
 1. `list_graphql_types`
    - Lists all available GraphQL types in the OpenCTI schema
