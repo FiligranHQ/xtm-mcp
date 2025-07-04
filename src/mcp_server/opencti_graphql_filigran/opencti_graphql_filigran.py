@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from functools import partial
 from logging import INFO, basicConfig, getLogger
-from typing import Any, Dict, Optional
+from typing import Any
 from gql import Client, gql
 from gql.transport.aiohttp import AIOHTTPTransport
 from mcp import types as mcp_types
@@ -109,6 +109,24 @@ async def list_tools_impl(_server: Server[ServerContext]) -> list[Tool]:
                     }
                 }
             }
+        ),
+        Tool(
+            name="get_query_fields",
+            description="Get all field names from the GraphQL Query type to identify correct entity field names",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        ),
+        Tool(
+            name="get_entity_names",
+            description="Get all unique entity names from STIX relationships mapping by splitting relationship keys",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
         )
     ]
 
@@ -132,51 +150,75 @@ async def handle_list_graphql_types(session, arguments: dict[str, Any]) -> list[
     return [mcp_types.TextContent(type="text", text=json.dumps(types, indent=2))]
 
 async def handle_get_types_definitions(session, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
-    """Handle get_types_definitions tool."""
-    logger.info("Executing get_types_definitions")
-    
+    """Handle get_type_definition tool."""
+    logger.info("Executing get_type_definition")
     type_names = arguments.get("type_name")
     if not type_names:
         return [mcp_types.TextContent(type="text", text="Error: type_name is required")]
     
+    # NEW: Check if it's a JSON string and parse it
     if isinstance(type_names, str):
-        type_names = [type_names]
+        try:
+            # Try to parse as JSON array first
+            parsed = json.loads(type_names)
+            if isinstance(parsed, list):
+                type_names = parsed
+            else:
+                type_names = [type_names]  # Single string value
+        except json.JSONDecodeError:
+            # Not JSON, treat as single string
+            type_names = [type_names]
     
     if not isinstance(type_names, list):
         return [mcp_types.TextContent(type="text", text="Error: type_name must be a string or array of strings")]
     
     introspection_query = """
-    query IntrospectionQuery {
-        __schema {
-            types {
-                name
-                kind
-                description
-                fields {
-                    name
-                    description
-                    type {
-                        name
-                        kind
-                    }
-                }
-            }
+query IntrospectionQuery {
+  __schema {
+    types {
+      name
+      kind
+      fields {
+        name
+        type {
+          kind
+          ofType {
+            name
+            kind
+          }
         }
+      }
     }
+  }
+}
     """
-    
     result = await session.execute(gql(introspection_query))
     all_types = result["__schema"]["types"]
     
-    type_definitions = {}
+    simplified_output = []
+    
     for type_name in type_names:
         type_def = next((t for t in all_types if t["name"] == type_name), None)
-        if type_def:
-            type_definitions[type_name] = type_def
+        if type_def and type_def.get("fields"):
+            # Extract field names and their type information
+            fields_info = []
+            for field in type_def["fields"]:
+                field_type = field["type"]
+                # Handle nested types (like NON_NULL, LIST)
+                while field_type.get("ofType"):
+                    field_type = field_type["ofType"]
+                
+                fields_info.append({
+                    "name": field["name"],
+                    "type": field_type.get("name"),
+                    "kind": field_type.get("kind")
+                })
+            simplified_output.append({type_name: fields_info})
         else:
-            type_definitions[type_name] = {"error": f"Type '{type_name}' not found in schema"}
+            # Type not found or has no fields
+            simplified_output.append({type_name: []})
     
-    return [mcp_types.TextContent(type="text", text=json.dumps(type_definitions, indent=2))]
+    return [mcp_types.TextContent(type="text", text=json.dumps(simplified_output, indent=2))]
 
 async def handle_execute_graphql_query(session, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     """Handle execute_graphql_query tool."""
@@ -244,7 +286,6 @@ async def handle_get_stix_relationships_mapping(session, arguments: dict[str, An
         type_name = arguments.get("type_name")
 
         # Original functionality for full mapping
-        processed_mappings = {}
         processed_entity_types = []
         for mapping in mappings:
             key = mapping["key"]
@@ -272,6 +313,139 @@ async def handle_get_stix_relationships_mapping(session, arguments: dict[str, An
             text=f"Error getting STIX relationships mapping: {str(e)}"
         )]
 
+async def handle_get_query_fields(session, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+    """Handle get_query_fields tool.
+    
+    Extracts all field names from the GraphQL Query type to help identify
+    the correct field names for entity queries.
+    
+    Args:
+        session: The GraphQL client session
+        arguments: Dictionary containing no parameters
+        
+    Returns:
+        List of TextContent containing the field names from the Query type
+    """
+    logger.info("Executing get_query_fields")
+    
+    query = """
+    query {
+      __type(name: "Query") {
+        fields(includeDeprecated: false) {
+          name
+          args {
+            name
+            type {
+              name
+              ofType {
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    
+    try:
+        result = await session.execute(gql(query))
+        query_type = result.get("__type")
+        
+        if not query_type or not query_type.get("fields"):
+            return [mcp_types.TextContent(type="text", text="Error: Query type not found or has no fields")]
+        
+        # Extract field names and their arguments from the Query type
+        fields_info = []
+        for field in query_type["fields"]:
+            field_info = {
+                "name": field["name"],
+                "args": []
+            }
+            
+            # Extract argument information
+            for arg in field.get("args", []):
+                arg_type = arg["type"]
+                # Handle nested types (like NON_NULL, LIST)
+                while arg_type.get("ofType"):
+                    arg_type = arg_type["ofType"]
+                
+                field_info["args"].append({
+                    "name": arg["name"],
+                    "type": arg_type.get("name")
+                })
+            
+            fields_info.append(field_info)
+        
+        # Sort alphabetically by field name for easier reading
+        fields_info.sort(key=lambda x: x["name"])
+        
+        response = {
+            "query_fields": fields_info
+        }
+        
+        return [mcp_types.TextContent(type="text", text=json.dumps(response, indent=2))]
+        
+    except Exception as e:
+        logger.error(f"Error getting Query fields: {str(e)}")
+        return [mcp_types.TextContent(
+            type="text", 
+            text=f"Error getting Query fields: {str(e)}"
+        )]
+
+async def handle_get_entity_names(session, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+    """Handle get_entity_names tool.
+    
+    Extracts all unique entity names from the STIX relationships mapping
+    by splitting the relationship keys on the underscore character.
+    
+    Args:
+        session: The GraphQL client session
+        arguments: Dictionary containing no parameters
+        
+    Returns:
+        List of TextContent containing all unique entity names
+    """
+    logger.info("Executing get_entity_names")
+    
+    query = """
+    query StixRelationshipsMapping {
+      schemaRelationsTypesMapping {
+        key
+      }
+    }
+    """
+    
+    try:
+        result = await session.execute(gql(query))
+        mappings = result.get("schemaRelationsTypesMapping", [])
+        
+        # Extract all unique entity names by splitting keys
+        entity_names = set()
+        for mapping in mappings:
+            key = mapping["key"]
+            # Split by underscore to get from and to entity names
+            if "_" in key:
+                from_entity, to_entity = key.split("_", 1)
+                entity_names.add(from_entity)
+                entity_names.add(to_entity)
+        
+        # Convert to sorted list for consistent output
+        entity_names_list = sorted(list(entity_names))
+        
+        response = {
+            "entity_names": entity_names_list,
+            "count": len(entity_names_list)
+        }
+        
+        return [mcp_types.TextContent(type="text", text=json.dumps(response, indent=2))]
+        
+    except Exception as e:
+        logger.error(f"Error getting entity names: {str(e)}")
+        return [mcp_types.TextContent(
+            type="text", 
+            text=f"Error getting entity names: {str(e)}"
+        )]
+
 async def call_tool_impl(_server: Server[ServerContext], name: str, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     """Execute a GraphQL tool using the appropriate handler function."""
     try:
@@ -283,7 +457,9 @@ async def call_tool_impl(_server: Server[ServerContext], name: str, arguments: d
                 "list_graphql_types": handle_list_graphql_types,
                 "get_types_definitions": handle_get_types_definitions,
                 "execute_graphql_query": handle_execute_graphql_query,
-                "get_stix_relationships_mapping": handle_get_stix_relationships_mapping
+                "get_stix_relationships_mapping": handle_get_stix_relationships_mapping,
+                "get_query_fields": handle_get_query_fields,
+                "get_entity_names": handle_get_entity_names
             }
             
             if name not in tool_handlers:
