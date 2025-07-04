@@ -173,24 +173,24 @@ async def handle_get_types_definitions(session, arguments: dict[str, Any]) -> li
         return [mcp_types.TextContent(type="text", text="Error: type_name must be a string or array of strings")]
     
     introspection_query = """
-query IntrospectionQuery {
-  __schema {
-    types {
-      name
-      kind
-      fields {
+    query IntrospectionQuery {
+    __schema {
+        types {
         name
-        type {
-          kind
-          ofType {
+        kind
+        fields {
             name
+            type {
             kind
-          }
+            ofType {
+                name
+                kind
+            }
+            }
         }
-      }
+        }
     }
-  }
-}
+    }
     """
     result = await session.execute(gql(introspection_query))
     all_types = result["__schema"]["types"]
@@ -215,7 +215,6 @@ query IntrospectionQuery {
                 })
             simplified_output.append({type_name: fields_info})
         else:
-            # Type not found or has no fields
             simplified_output.append({type_name: []})
     
     return [mcp_types.TextContent(type="text", text=json.dumps(simplified_output, indent=2))]
