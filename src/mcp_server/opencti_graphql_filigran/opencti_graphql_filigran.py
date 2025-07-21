@@ -98,6 +98,20 @@ async def list_tools_impl(_server: Server[ServerContext]) -> list[Tool]:
             }
         ),
         Tool(
+            name="validate_graphql_query",
+            description="Validate a GraphQL query without returning its result. Returns only success status or error message.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "GraphQL query to validate"
+                    }
+                },
+                "required": ["query"]
+            }
+        ),
+        Tool(
             name="get_stix_relationships_mapping",
             description="Get all possible STIX relationships between types and their available relationship types",
             inputSchema={
@@ -247,6 +261,42 @@ async def handle_execute_graphql_query(session, arguments: dict[str, Any]) -> li
         
     except Exception as e:
         logger.error(f"❌ GraphQL execution error: {str(e)}")
+        error_response = {
+            "success": False,
+            "error": str(e)
+        }
+        return [mcp_types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
+
+async def handle_validate_graphql_query(session, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+    """Handle validate_graphql_query tool."""
+    logger.info("Executing validate_graphql_query")
+    
+    if not isinstance(arguments, dict):
+        return [mcp_types.TextContent(type="text", text=f"Error: arguments must be a dictionary, got {type(arguments)}")]
+    
+    query_string = arguments.get("query")
+    
+    if not query_string:
+        return [mcp_types.TextContent(type="text", text="Error: query parameter is missing or empty")]
+    
+    try:
+        logger.info(f"🚀 Validating GraphQL query: {query_string[:100]}...")
+        
+        # Auto-add "query" keyword if missing
+        if not query_string.strip().startswith("query"):
+            query_string = f"query {query_string}"
+        
+        # Attempt to execute the query to validate its structure
+        await session.execute(gql(query_string))
+        
+        success_response = {
+            "success": True,
+            "error": ""
+        }
+        return [mcp_types.TextContent(type="text", text=json.dumps(success_response, indent=2))]
+        
+    except Exception as e:
+        logger.error(f"❌ GraphQL validation error: {str(e)}")
         error_response = {
             "success": False,
             "error": str(e)
@@ -456,6 +506,7 @@ async def call_tool_impl(_server: Server[ServerContext], name: str, arguments: d
                 "list_graphql_types": handle_list_graphql_types,
                 "get_types_definitions": handle_get_types_definitions,
                 "execute_graphql_query": handle_execute_graphql_query,
+                "validate_graphql_query": handle_validate_graphql_query,
                 "get_stix_relationships_mapping": handle_get_stix_relationships_mapping,
                 "get_query_fields": handle_get_query_fields,
                 "get_entity_names": handle_get_entity_names
