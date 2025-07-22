@@ -81,7 +81,26 @@ Or configure it in your application with these parameters:
    - Parameters:
      - `query`: String containing the GraphQL query
 
-4. `get_stix_relationships_mapping`
+4. `validate_graphql_query`
+   - Validates a GraphQL query without executing it
+   - Parameters:
+     - `query`: String containing the GraphQL query to validate
+
+5. `get_stix_relationships_mapping`
    - Gets STIX relationships between types
    - Optional parameters:
      - `type_name`: Filter relationships for a specific type
+
+6. `get_query_fields`
+   - Retrieves all field names from the GraphQL Query type
+   - Helps identify correct entity field names for queries
+   - No parameters required
+
+7. `get_entity_names`
+   - Extracts all unique entity names from STIX relationships mapping
+   - No parameters required
+
+8. `search_entities_by_name`
+   - Searches for entities by name and intersects with available entity types
+   - Parameters:
+     - `entity_name`: Name of the entity to search for
