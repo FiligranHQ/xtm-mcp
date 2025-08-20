@@ -1,13 +1,13 @@
 import json
 from typing import Any
 
-from gql import Client, gql
+from gql import gql
 from mcp import types as mcp_types
 
 from opencti_mcp.graphql_queries import QUERY_FIELDS
 
 
-async def handle(session: Client, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     result = await session.execute(gql(QUERY_FIELDS))
     query_type = result.get("__type")
     if not query_type or not query_type.get("fields"):
@@ -31,5 +31,3 @@ async def handle(session: Client, arguments: dict[str, Any]) -> list[mcp_types.T
     fields_info.sort(key=lambda x: str(x["name"]))
     response = {"query_fields": fields_info}
     return [mcp_types.TextContent(type="text", text=json.dumps(response, indent=2))]
-
-

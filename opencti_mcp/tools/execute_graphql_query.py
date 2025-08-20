@@ -1,11 +1,11 @@
 import json
 from typing import Any
 
-from gql import Client, gql
+from gql import gql
 from mcp import types as mcp_types
 
 
-async def handle(session: Client, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     if not isinstance(arguments, dict):
         return [
             mcp_types.TextContent(

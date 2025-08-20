@@ -41,9 +41,7 @@ def parse_args() -> argparse.Namespace:
         "--url",
         dest="url",
         default=None,
-        help=(
-            "OpenCTI base URL (the server will use the /graphql endpoint)"
-        ),
+        help=("OpenCTI base URL (the server will use the /graphql endpoint)"),
     )
     parser.add_argument("--token", dest="token", default=None, help="OpenCTI API token")
     return parser.parse_args()
@@ -126,9 +124,7 @@ async def list_tools_impl(_server: Server[ServerContext]) -> list[Tool]:
             ),
             inputSchema={
                 "type": "object",
-                "properties": {
-                    "type_name": {"type": "string", "description": "Optional filter"}
-                },
+                "properties": {"type_name": {"type": "string", "description": "Optional filter"}},
             },
         ),
         Tool(

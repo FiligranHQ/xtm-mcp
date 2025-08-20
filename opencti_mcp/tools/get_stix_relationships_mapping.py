@@ -1,13 +1,13 @@
 import json
 from typing import Any
 
-from gql import Client, gql
+from gql import gql
 from mcp import types as mcp_types
 
 from opencti_mcp.graphql_queries import SCHEMA_RELATIONS_TYPES_MAPPING
 
 
-async def handle(session: Client, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     result = await session.execute(gql(SCHEMA_RELATIONS_TYPES_MAPPING))
     mappings = result.get("schemaRelationsTypesMapping", [])
     type_name = arguments.get("type_name")
@@ -36,5 +36,3 @@ async def handle(session: Client, arguments: dict[str, Any]) -> list[mcp_types.T
         response = {"relationships_mapping": full_mapping}
 
     return [mcp_types.TextContent(type="text", text=json.dumps(response, indent=2))]
-
-

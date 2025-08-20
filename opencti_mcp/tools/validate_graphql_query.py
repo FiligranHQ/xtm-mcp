@@ -1,18 +1,16 @@
 import json
 from typing import Any
 
-from gql import Client, gql
+from gql import gql
 from mcp import types as mcp_types
 
 
-async def handle(session: Client, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     if not isinstance(arguments, dict):
         return [
             mcp_types.TextContent(
                 type="text",
-                text=(
-                    f"Error: arguments must be a dictionary, got {type(arguments)}"
-                ),
+                text=(f"Error: arguments must be a dictionary, got {type(arguments)}"),
             )
         ]
 
@@ -42,5 +40,3 @@ async def handle(session: Client, arguments: dict[str, Any]) -> list[mcp_types.T
                 text=json.dumps({"success": False, "error": str(e)}, indent=2),
             )
         ]
-
-

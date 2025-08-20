@@ -1,13 +1,13 @@
 import json
 from typing import Any
 
-from gql import Client, gql
+from gql import gql
 from mcp import types as mcp_types
 
 from opencti_mcp.graphql_queries import SCHEMA_RELATIONS_TYPES_MAPPING, SEARCH_ENTITIES_BY_NAME
 
 
-async def handle(session: Client, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     entity_name = arguments.get("entity_name", "").strip()
     if not entity_name:
         return [
@@ -41,5 +41,3 @@ async def handle(session: Client, arguments: dict[str, Any]) -> list[mcp_types.T
 
     intersection = sorted(list(found_entity_types.intersection(available_entity_types)))
     return [mcp_types.TextContent(type="text", text=json.dumps(intersection, indent=2))]
-
-
