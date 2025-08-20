@@ -60,6 +60,23 @@ If your MCP-enabled client supports JSON config, a minimal setup looks like:
 }
 ```
 
+Alternatively pass flags:
+
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "command": "python",
+      "args": [
+        "-m", "opencti_mcp.server",
+        "--url", "https://your-opencti/",
+        "--token", "<token>"
+      ]
+    }
+  }
+}
+```
+
 ## Development
 
 Install developer tooling (ruff, black, mypy):
@@ -79,21 +96,4 @@ black .
 
 # Type-check
 mypy .
-```
-
-Alternatively pass flags:
-
-```json
-{
-  "mcpServers": {
-    "opencti-graphql-mcp": {
-      "command": "python",
-      "args": [
-        "-m", "opencti_mcp.server",
-        "--url", "https://your-opencti/",
-        "--token", "<token>"
-      ]
-    }
-  }
-}
 ```
