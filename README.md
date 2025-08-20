@@ -5,13 +5,15 @@ This repository hosts MCP (Model Context Protocol) servers related to Filigran's
 ## Requirements
 
 - Python 3.10+
-- Poetry for dependency management
+- pip and venv (or your preferred environment manager)
 
 ## Quickstart (OpenCTI MCP)
 
-1. Install dependencies:
+1. Create a virtual environment and install dependencies:
 ```bash
-poetry install
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 2. Configure environment (create `.env` or export variables):
@@ -34,7 +36,7 @@ poetry install
 
 3. Run the server:
 ```bash
-poetry run opencti-mcp --url "$OPENCTI_URL" --token "$OPENCTI_TOKEN"
+python -m opencti_mcp.server --url "$OPENCTI_URL" --token "$OPENCTI_TOKEN"
 ```
 
 For MCP client configuration and detailed tool documentation, see `opencti_mcp/README.md`.
@@ -47,8 +49,8 @@ If your MCP-enabled client supports JSON config, a minimal setup looks like:
 {
   "mcpServers": {
     "opencti-graphql-mcp": {
-      "command": "poetry",
-      "args": ["run", "opencti-mcp"],
+      "command": "python",
+      "args": ["-m", "opencti_mcp.server"],
       "env": {
         "OPENCTI_URL": "https://your-opencti/",
         "OPENCTI_TOKEN": "<token>"
@@ -58,16 +60,36 @@ If your MCP-enabled client supports JSON config, a minimal setup looks like:
 }
 ```
 
+## Development
+
+Install developer tooling (ruff, black, mypy):
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Run checks:
+
+```bash
+# Lint
+ruff check .
+
+# Format
+black .
+
+# Type-check
+mypy .
+```
+
 Alternatively pass flags:
 
 ```json
 {
   "mcpServers": {
     "opencti-graphql-mcp": {
-      "command": "poetry",
+      "command": "python",
       "args": [
-        "run",
-        "opencti-mcp",
+        "-m", "opencti_mcp.server",
         "--url", "https://your-opencti/",
         "--token", "<token>"
       ]

@@ -8,8 +8,12 @@ The goal of this MCP server is to provide an interface for interacting with an O
 
 ## Install
 
+Run the following from the repository root:
+
 ```bash
-poetry install
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
 ## Configuration
@@ -27,7 +31,7 @@ cp .env.example .env
 ## Run
 
 ```bash
-poetry run opencti-mcp --url "https://your-opencti/" --token "<token>"
+python -m opencti_mcp.server --url "https://your-opencti/" --token "<token>"
 ```
 
 ## MCP client configuration
@@ -38,8 +42,8 @@ Configure your MCP-enabled client to launch this server. Example configuration:
 {
   "mcpServers": {
     "opencti-graphql-mcp": {
-      "command": "poetry",
-      "args": ["run", "opencti-mcp"],
+      "command": "python",
+      "args": ["-m", "opencti_mcp.server"],
       "env": {
         "OPENCTI_URL": "https://your-opencti/",
         "OPENCTI_TOKEN": "<token>"
@@ -55,10 +59,9 @@ Alternatively, you can omit `env` and pass flags via `args`, e.g.:
 {
   "mcpServers": {
     "opencti-graphql-mcp": {
-      "command": "poetry",
+      "command": "python",
       "args": [
-        "run",
-        "opencti-mcp",
+        "-m", "opencti_mcp.server",
         "--url",
         "https://your-opencti/",
         "--token",
@@ -107,3 +110,19 @@ A typical agent workflow proceeds as follows:
 3. Retrieve the definitions of these types to understand their relevant fields.
 4. Construct a GraphQL query that can answer the user's question.
 5. Execute the query and return the response to the user.
+
+## Development
+
+Install developer tooling (ruff, black, mypy):
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+Run checks:
+
+```bash
+ruff check .
+black .
+mypy .
+```

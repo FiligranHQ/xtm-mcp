@@ -1,0 +1,8 @@
+-r requirements.txt
+
+# Developer tooling
+ruff==0.12.9
+black==25.1.0
+mypy==1.17.1
+
+
