@@ -98,6 +98,20 @@ async def list_tools_impl(_server: Server[ServerContext]) -> list[Tool]:
             }
         ),
         Tool(
+            name="validate_graphql_query",
+            description="Validate a GraphQL query without returning its result. Returns only success status or error message.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "GraphQL query to validate"
+                    }
+                },
+                "required": ["query"]
+            }
+        ),
+        Tool(
             name="get_stix_relationships_mapping",
             description="Get all possible STIX relationships between types and their available relationship types",
             inputSchema={
@@ -126,6 +140,20 @@ async def list_tools_impl(_server: Server[ServerContext]) -> list[Tool]:
                 "type": "object",
                 "properties": {},
                 "required": []
+            }
+        ),
+        Tool(
+            name="search_entities_by_name",
+            description="Search for entities by name and intersect with available entity types",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "entity_name": {
+                        "type": "string",
+                        "description": "Name of the entity to search for"
+                    }
+                },
+                "required": ["entity_name"]
             }
         )
     ]
@@ -247,6 +275,42 @@ async def handle_execute_graphql_query(session, arguments: dict[str, Any]) -> li
         
     except Exception as e:
         logger.error(f"❌ GraphQL execution error: {str(e)}")
+        error_response = {
+            "success": False,
+            "error": str(e)
+        }
+        return [mcp_types.TextContent(type="text", text=json.dumps(error_response, indent=2))]
+
+async def handle_validate_graphql_query(session, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+    """Handle validate_graphql_query tool."""
+    logger.info("Executing validate_graphql_query")
+    
+    if not isinstance(arguments, dict):
+        return [mcp_types.TextContent(type="text", text=f"Error: arguments must be a dictionary, got {type(arguments)}")]
+    
+    query_string = arguments.get("query")
+    
+    if not query_string:
+        return [mcp_types.TextContent(type="text", text="Error: query parameter is missing or empty")]
+    
+    try:
+        logger.info(f"🚀 Validating GraphQL query: {query_string[:100]}...")
+        
+        # Auto-add "query" keyword if missing
+        if not query_string.strip().startswith("query"):
+            query_string = f"query {query_string}"
+        
+        # Attempt to execute the query to validate its structure
+        await session.execute(gql(query_string))
+        
+        success_response = {
+            "success": True,
+            "error": ""
+        }
+        return [mcp_types.TextContent(type="text", text=json.dumps(success_response, indent=2))]
+        
+    except Exception as e:
+        logger.error(f"❌ GraphQL validation error: {str(e)}")
         error_response = {
             "success": False,
             "error": str(e)
@@ -445,6 +509,87 @@ async def handle_get_entity_names(session, arguments: dict[str, Any]) -> list[mc
             text=f"Error getting entity names: {str(e)}"
         )]
 
+async def handle_search_entities_by_name(session, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
+    """Handle search_entities_by_name tool.
+    
+    This tool searches for entities by name and returns the intersection with available entity types.
+    
+    Args:
+        session: The GraphQL client session
+        arguments: Dictionary containing:
+            - entity_name: Name of the entity to search for
+            
+    Returns:
+        List of TextContent containing only the intersection of found and available entity types
+    """
+    logger.info("Executing search_entities_by_name")
+    
+    entity_name = arguments.get("entity_name", "").strip()
+    if not entity_name:
+        return [mcp_types.TextContent(type="text", text="Error: entity_name is required and cannot be empty")]
+    
+    try:
+        # Build and execute the search query
+        search_query = f"""
+        query EntitySearchByName {{
+          stixCoreObjects(
+            search: "{entity_name}"
+            orderBy: _score
+            orderMode: desc
+            first: 10
+          ) {{
+            edges {{
+              node {{
+                entity_type
+              }}
+            }}
+          }}
+        }}
+        """
+        
+        # Execute search query
+        search_result = await session.execute(gql(search_query))
+        
+        # Get all available entity types
+        entity_names_query = """
+        query StixRelationshipsMapping {
+          schemaRelationsTypesMapping {
+            key
+          }
+        }
+        """
+        entity_names_result = await session.execute(gql(entity_names_query))
+        
+        # Extract unique entity types from search results
+        found_entity_types = set()
+        edges = search_result.get("stixCoreObjects", {}).get("edges", [])
+        for edge in edges:
+            entity_type = edge.get("node", {}).get("entity_type")
+            if entity_type:
+                found_entity_types.add(entity_type)
+        
+        # Extract all unique entity names from mappings
+        available_entity_types = set()
+        mappings = entity_names_result.get("schemaRelationsTypesMapping", [])
+        for mapping in mappings:
+            key = mapping["key"]
+            if "_" in key:
+                from_entity, to_entity = key.split("_", 1)
+                available_entity_types.add(from_entity)
+                available_entity_types.add(to_entity)
+        
+        # Find intersection and sort it
+        intersection = sorted(list(found_entity_types.intersection(available_entity_types)))
+        
+        return [mcp_types.TextContent(type="text", text=json.dumps(intersection, indent=2))]
+        
+    except Exception as e:
+        logger.error(f"Error in search_entities_by_name: {str(e)}")
+        return [mcp_types.TextContent(
+            type="text", 
+            text=f"Error searching entities by name: {str(e)}"
+        )]
+
 async def call_tool_impl(_server: Server[ServerContext], name: str, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     """Execute a GraphQL tool using the appropriate handler function."""
     try:
@@ -456,9 +601,11 @@ async def call_tool_impl(_server: Server[ServerContext], name: str, arguments: d
                 "list_graphql_types": handle_list_graphql_types,
                 "get_types_definitions": handle_get_types_definitions,
                 "execute_graphql_query": handle_execute_graphql_query,
+                "validate_graphql_query": handle_validate_graphql_query,
                 "get_stix_relationships_mapping": handle_get_stix_relationships_mapping,
                 "get_query_fields": handle_get_query_fields,
-                "get_entity_names": handle_get_entity_names
+                "get_entity_names": handle_get_entity_names,
+                "search_entities_by_name": handle_search_entities_by_name
             }
             
             if name not in tool_handlers:
