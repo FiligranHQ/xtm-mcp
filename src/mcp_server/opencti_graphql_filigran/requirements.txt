@@ -1,4 +1,0 @@
-python-dotenv
-gql
-mcp
-aiohttp

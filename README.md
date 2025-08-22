@@ -1,106 +1,99 @@
-# Agentic Platform - MCP Servers Collection
+# XTM-One
 
-This repository contains a collection of MCP (Machine Control Protocol) servers designed to interact with various services and APIs. Each server provides specific tools and capabilities for different platforms.
+This repository hosts MCP (Model Context Protocol) servers related to Filigran's XTM Suite. The first server targets OpenCTI's GraphQL API and can be found in `opencti_mcp`. More MCP servers to come!
 
-## Available MCP Servers
+## Requirements
 
-### 1. OpenCTI GraphQL Filigran Server
+- Python 3.10+
+- pip and venv (or your preferred environment manager)
 
-A server that provides tools to interact with OpenCTI's GraphQL API, allowing you to query and manipulate data in OpenCTI through a standardized interface.
+## Quickstart (OpenCTI MCP)
 
-#### Features
-
-- List available GraphQL types
-- Get detailed type definitions
-- Execute custom GraphQL queries
-- Get STIX relationships mapping between types
-
-#### Prerequisites
-
-- Python 3.7+
-- Access to an OpenCTI instance
-- OpenCTI API token
-
-#### Environment Variables
-
-The OpenCTI server requires the following environment variables:
-
-- `OPENCTI_URL`: The URL of your OpenCTI GraphQL endpoint
-- `OPENCTI_TOKEN`: Your OpenCTI API token
-
-
-#### Installation
-
-1. Clone the repository:
+1. Create a virtual environment and install dependencies:
 ```bash
-git clone https://github.com/yourusername/agentic_platform.git
-cd agentic_platform/src/mcp_server/opencti_graphql_filigran
-```
-
-2. Install dependencies for the specific server you want to use:
-```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+2. Configure environment (create `.env` or export variables):
 
+   Option A (.env)
+   ```bash
+   cp .env.example .env
+   # then edit .env to set:
+   # OPENCTI_URL=https://your-opencti
+   # OPENCTI_TOKEN=<your-token>
+   ```
 
-#### Usage
+   Option B (environment variables)
+   ```bash
+   export OPENCTI_URL="https://your-opencti"
+   export OPENCTI_TOKEN="<your-token>"
+   ```
 
-You can run the server using Python directly:
+   Note: Provide the base URL; the server will automatically use the `/graphql` endpoint.
 
+3. Run the server:
 ```bash
-python opencti_graphql_filigran.py
+python -m opencti_mcp.server --url "$OPENCTI_URL" --token "$OPENCTI_TOKEN"
 ```
 
-Or configure it in your application with these parameters:
+For MCP client configuration and detailed tool documentation, see `opencti_mcp/README.md`.
+
+## MCP client configuration (quick copy)
+
+If your MCP-enabled client supports JSON config, a minimal setup looks like:
 
 ```json
 {
-    "command": "python",
-    "args": ["<path_of_script>/opencti_graphql_filigran.py"],
-    "env": {
-        "OPENCTI_URL": "<url_graphql>",
-        "OPENCTI_TOKEN": "<token_graphql>"
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "command": "python",
+      "args": ["-m", "opencti_mcp.server"],
+      "env": {
+        "OPENCTI_URL": "https://your-opencti/",
+        "OPENCTI_TOKEN": "<token>"
+      }
     }
+  }
 }
 ```
 
-#### Available Tools
+Alternatively pass flags:
 
-1. `list_graphql_types`
-   - Lists all available GraphQL types in the OpenCTI schema
-   - No parameters required
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "command": "python",
+      "args": [
+        "-m", "opencti_mcp.server",
+        "--url", "https://your-opencti/",
+        "--token", "<token>"
+      ]
+    }
+  }
+}
+```
 
-2. `get_types_definitions`
-   - Fetches detailed definitions for specific GraphQL types
-   - Parameters:
-     - `type_name`: String or array of strings representing type names
+## Development
 
-3. `execute_graphql_query`
-   - Executes a custom GraphQL query
-   - Parameters:
-     - `query`: String containing the GraphQL query
+Install developer tooling (ruff, black, mypy):
 
-4. `validate_graphql_query`
-   - Validates a GraphQL query without executing it
-   - Parameters:
-     - `query`: String containing the GraphQL query to validate
+```bash
+pip install -r requirements-dev.txt
+```
 
-5. `get_stix_relationships_mapping`
-   - Gets STIX relationships between types
-   - Optional parameters:
-     - `type_name`: Filter relationships for a specific type
+Run checks:
 
-6. `get_query_fields`
-   - Retrieves all field names from the GraphQL Query type
-   - Helps identify correct entity field names for queries
-   - No parameters required
+```bash
+# Lint
+ruff check .
 
-7. `get_entity_names`
-   - Extracts all unique entity names from STIX relationships mapping
-   - No parameters required
+# Format
+black .
 
-8. `search_entities_by_name`
-   - Searches for entities by name and intersects with available entity types
-   - Parameters:
-     - `entity_name`: Name of the entity to search for
+# Type-check
+mypy .
+```

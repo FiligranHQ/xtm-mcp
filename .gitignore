@@ -1,0 +1,40 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editors/IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+
+# Python version manager
+.python-version
+
+
