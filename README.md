@@ -1,4 +1,4 @@
-# XTM One
+# XTM-One
 
 This repository hosts MCP (Model Context Protocol) servers related to Filigran's XTM Suite. The first server targets OpenCTI's GraphQL API and can be found in `opencti_mcp`. More MCP servers to come!
 
