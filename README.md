@@ -1,6 +1,14 @@
-# XTM-One
+# XTM-mcp
 
 This repository hosts MCP (Model Context Protocol) servers related to Filigran's XTM Suite. The first server targets OpenCTI's GraphQL API and can be found in `opencti_mcp`. More MCP servers to come!
+
+## Versioning strategy
+This repository follows Semantic Versioning (SemVer) with the version format `X.Y.Z`, where:
+- X (Major): Incremented for significant changes that introduce breaking changes or major new features that are not backward-compatible. 
+- Y (Minor): Incremented for new features or enhancements that are backward-compatible. Example: adding a new MCP server for one of the tools in the XTM suite
+- Z (Patch): Incremented for bug fixes or minor updates that are backward-compatible
+
+Versions are tagged in the format X.Y.Z (e.g., 1.0.0) in the GitHub repository.
 
 ## Requirements
 
