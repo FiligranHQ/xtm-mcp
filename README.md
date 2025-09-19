@@ -10,6 +10,20 @@ This repository follows Semantic Versioning (SemVer) with the version format `X.
 
 Versions are tagged in the format X.Y.Z (e.g., 1.0.0) in the GitHub repository.
 
+## Specific configuration
+
+### Opencti MCP server
+These following tools rely on GraphQL **introspection queries** : 
+
+- list_graphql_types
+- get_types_definitions
+- get_query_fields
+
+Even though they are enabled by default, most of OpenCTI environments disable **introspection queries**. To use these tools, you will have to check your OpenCTI configuration, as described in the [relevant documentation](https://docs.opencti.io/latest/deployment/configuration/?h=introspection#technical-customization). Namely, you have to have the environment variables :
+* `APP__GRAPHQL__PLAYGROUND__FORCE_DISABLED_INTROSPECTION` set to `true` (default)
+* `APP__GRAPHQL__PLAYGROUND__ENABLED` set to `true` (default).
+
+
 ## Requirements
 
 - Python 3.10+
