@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/filigranhq-xtm-mcp-badge.png)](https://mseep.ai/app/filigranhq-xtm-mcp)
+
 # XTM MCP Servers
 
 This repository hosts MCP (Model Context Protocol) servers related to Filigran's XTM Suite. The first server targets OpenCTI's GraphQL API and can be found in `opencti_mcp`. More MCP servers to come!
