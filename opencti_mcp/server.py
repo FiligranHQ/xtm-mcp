@@ -23,6 +23,7 @@ from opencti_mcp.tools import (
     get_query_fields,
     get_stix_relationships_mapping,
     get_types_definitions,
+    get_types_definitions_from_schema,
     list_graphql_types,
     search_entities_by_name,
     validate_graphql_query,
@@ -99,6 +100,18 @@ async def list_tools_impl(_server: Server[ServerContext]) -> list[Tool]:
             },
         ),
         Tool(
+            name="get_types_definitions_from_schema",
+            description=(
+                "Return all type definitions using /schema (SDL) and local introspection. "
+                "Requires OpenCTI >= 6.8.0."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
+        Tool(
             name="execute_graphql_query",
             description="Execute a GraphQL query and return the result",
             inputSchema={
@@ -159,6 +172,7 @@ async def call_tool_impl(
             handlers = {
                 "list_graphql_types": list_graphql_types.handle,
                 "get_types_definitions": get_types_definitions.handle,
+                "get_types_definitions_from_schema": get_types_definitions_from_schema.handle,
                 "execute_graphql_query": execute_graphql_query.handle,
                 "validate_graphql_query": validate_graphql_query.handle,
                 "get_stix_relationships_mapping": get_stix_relationships_mapping.handle,

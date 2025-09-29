@@ -4,5 +4,5 @@
 ruff==0.12.9
 black==25.1.0
 mypy==1.17.1
-
-
+types-requests==2.32.4.20250809
+mcp-cli==0.7.5
