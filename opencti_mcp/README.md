@@ -89,15 +89,19 @@ Alternatively, you can omit `env` and pass flags via `args`, e.g.:
   - Outputs: JSON array of objects, each shaped as `{ "<TypeName>": [{ "name": string, "type": string|null, "kind": string|null }] }`
   - Errors: returns a text error message if `type_name` missing or of wrong type
 
+- `get_types_definitions_from_schema`: Return all type definitions using `/schema`.
+  - Inputs: none (reads `OPENCTI_URL` and `OPENCTI_TOKEN` from environment/.env)
+  - Outputs: JSON object mapping type name to type definition (fields, queries, relationship_type, related_types)
+
 - `execute_graphql_query`: Execute a GraphQL query and return the result.
   - Inputs:
-    - `query` (required): GraphQL query string; if it does not start with `query`, the server will prepend `query `
+    - `query` (required): GraphQL query string; if it does not start with `query`, the server will prepend `query`
   - Outputs: JSON object `{ "success": true, "data": <GraphQL result> }` on success
   - Errors: JSON object `{ "success": false, "error": string }` on failure
 
 - `validate_graphql_query`: Validate a GraphQL query without returning its result.
   - Inputs:
-    - `query` (required): GraphQL query string; if it does not start with `query`, the server will prepend `query `
+    - `query` (required): GraphQL query string; if it does not start with `query`, the server will prepend `query`
   - Outputs: JSON object `{ "success": true, "error": "" }` if the query validates and executes successfully
   - Errors: JSON object `{ "success": false, "error": string }` if validation/execution fails
 
@@ -145,6 +149,14 @@ A typical agent workflow proceeds as follows:
 3. Retrieve the definitions of these types to understand their relevant fields.
 4. Construct a GraphQL query that can answer the user's question.
 5. Execute the query and return the response to the user.
+
+## Notes on schema access
+
+- GraphQL introspection queries (via `/graphql`) is disabled by default in OpenCTI.
+- The `/schema` endpoint is available from OpenCTI 6.8.0 onwards and returns the schema SDL.
+- This MCP supports both approaches:
+  - Tools that rely on `/graphql` introspection (e.g., `get_types_definitions`). In this case, the introspection queries should be activated in your OpenCTI setup.
+  - Tools that load SDL from `/schema` and introspect locally (e.g., `get_types_definitions_from_schema`)
 
 ## Development
 
