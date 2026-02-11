@@ -44,9 +44,13 @@ def fetch_schema_sdl(opencti_url: str, token: str) -> str:
     }
     try:
         resp = requests.get(endpoint, headers=headers, timeout=60)
-        resp.raise_for_status()  
+        resp.raise_for_status()
     except requests.exceptions.HTTPError as e:
-        msg = f"Status code: {resp.status_code};  Failed to fetch data from {resp.url}. Are you sure your OpenCTI version >= 6.8.0 ?"
+        msg = (
+            f"Status code: {resp.status_code}; "
+            f"Failed to fetch data from {resp.url}. "
+            f"Are you sure your OpenCTI version >= 6.8.0 ?"
+        )
         raise requests.exceptions.HTTPError(msg) from e
 
     data = resp.json()
