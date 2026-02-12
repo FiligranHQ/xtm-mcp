@@ -6,20 +6,7 @@ Tools and a server to interact with OpenCTI's GraphQL API via MCP.
 
 The goal of this MCP server is to provide an interface for interacting with an OpenCTI instance via its GraphQL API. To achieve this, we define a set of tools that help the agent introspect the schema, list available types and corresponding fields, and run or validate queries against your OpenCTI server. At this point, we focus on queries (i.e. reading the data). We plan to handle mutations in the near future.
 
-## Python compatibility
-
-- Tested with Python 3.10+
-- The codebase targets Python 3.10 (see `pyproject.toml` mypy config). Newer versions (3.11/3.12) should work as well.
-
-## Install
-
-Run the following from the repository root:
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+> For environment setup (venv, dependencies) and developer tooling, see the [root README](../README.md).
 
 ## Configuration
 
@@ -36,12 +23,36 @@ cp .env.example .env
 ## Run
 
 ```bash
+# STDIO transport (default)
 python -m opencti_mcp.server --url "https://your-opencti/" --token "<token>"
+
+# Explicitly select STDIO transport
+python -m opencti_mcp.server --transport stdio --url "https://your-opencti/" --token "<token>"
+
+# Streamable HTTP transport (recommended for remote / browser-based clients)
+python -m opencti_mcp.server \
+  --transport streamable-http \
+  --host "127.0.0.1" \
+  --port 8000 \
+  --url "https://your-opencti/" \
+  --token "<token>"
+
+# SSE transport (legacy HTTP streaming)
+python -m opencti_mcp.server \
+  --transport sse \
+  --host "127.0.0.1" \
+  --port 8000 \
+  --url "https://your-opencti/" \
+  --token "<token>"
 ```
 
 ## MCP client configuration
 
-Configure your MCP-enabled client to launch this server. Example configuration:
+Configure your MCP-enabled client to connect to this server. The JSON config differs depending on the transport.
+
+### STDIO (default)
+
+The client launches the server process automatically:
 
 ```json
 {
@@ -75,6 +86,89 @@ Alternatively, you can omit `env` and pass flags via `args`, e.g.:
     }
   }
 }
+```
+
+### SSE
+
+For SSE, the server must be started separately first (see the `--transport sse` command above). The client then connects to the running server:
+
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "url": "http://127.0.0.1:8000/sse"
+    }
+  }
+}
+```
+
+### Streamable HTTP
+
+For streamable HTTP, the server must be started separately first (see the `--transport streamable-http` command above). The client then connects to the running server:
+
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+## Testing the server
+
+After starting the server you can quickly verify each transport is working.
+
+### STDIO
+
+STDIO communicates over stdin/stdout pipes, so it cannot be tested with `curl`. You can pipe a JSON-RPC `initialize` message directly to the server process:
+
+```bash
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' \
+  | python -m opencti_mcp.server --url "$OPENCTI_URL" --token "$OPENCTI_TOKEN"
+```
+
+A successful response is a JSON object containing `serverInfo` and `capabilities`.
+
+Alternatively, use the MCP Inspector:
+
+```bash
+npx @modelcontextprotocol/inspector
+```
+
+### SSE
+
+With the server running on `--transport sse`, open the event stream with `curl`:
+
+```bash
+curl -N http://127.0.0.1:8000/sse
+```
+
+A successful connection immediately receives an `event: endpoint` line followed by a `data:` payload containing the message posting URL.
+
+### Streamable HTTP
+
+With the server running on `--transport streamable-http`, send an `initialize` request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
+```
+
+A successful response is a JSON object containing `serverInfo` and `capabilities`.
+
+> **Note:** A plain `GET http://127.0.0.1:8000/mcp` returns `406 Not Acceptable` — this is expected. The streamable HTTP protocol requires specific `Accept` and `Content-Type` headers (see above).
+
+### Automated test suite
+
+The project includes an automated test suite that validates all three transports end-to-end with a mocked GraphQL backend (no real OpenCTI instance needed):
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/
 ```
 
 ## Available tools
@@ -158,18 +252,13 @@ A typical agent workflow proceeds as follows:
   - Tools that rely on `/graphql` introspection (e.g., `get_types_definitions`). In this case, the introspection queries should be activated in your OpenCTI setup.
   - Tools that load SDL from `/schema` and introspect locally (e.g., `get_types_definitions_from_schema`)
 
-## Development
+The following tools rely on GraphQL **introspection queries**:
 
-Install developer tooling (ruff, black, mypy):
+- `list_graphql_types`
+- `get_types_definitions`
+- `get_query_fields`
 
-```bash
-pip install -r requirements-dev.txt
-```
+Even though they are enabled by default, most OpenCTI environments disable **introspection queries**. To use these tools, check your OpenCTI configuration as described in the [relevant documentation](https://docs.opencti.io/latest/deployment/configuration/?h=introspection#technical-customization). Namely, you need the environment variables:
 
-Run checks:
-
-```bash
-ruff check .
-black .
-mypy .
-```
+* `APP__GRAPHQL__PLAYGROUND__FORCE_DISABLED_INTROSPECTION` set to `true` (default)
+* `APP__GRAPHQL__PLAYGROUND__ENABLED` set to `true` (default)

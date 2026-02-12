@@ -1,6 +1,6 @@
 gql==3.5.3
 aiohttp==3.12.15
 python-dotenv==1.1.1
-mcp==1.13.0
+mcp[cli]==1.26.0
 requests==2.32.5
 graphql-core==3.2.6
