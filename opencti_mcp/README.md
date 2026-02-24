@@ -1,58 +1,81 @@
-# OpenCTI GraphQL MCP server
+# OpenCTI GraphQL MCP Server
 
-Tools and a server to interact with OpenCTI's GraphQL API via MCP.
+MCP server to interact with OpenCTI through GraphQL for:
+- schema discovery
+- threat data retrieval
+- brand posture workflows (read + publish back to OpenCTI)
 
-## Motivation
+## Requirements
 
-The goal of this MCP server is to provide an interface for interacting with an OpenCTI instance via its GraphQL API. To achieve this, we define a set of tools that help the agent introspect the schema, list available types and corresponding fields, and run or validate queries against your OpenCTI server. At this point, we focus on queries (i.e. reading the data). We plan to handle mutations in the near future.
+- Python 3.10+
+- OpenCTI URL + API token
 
-> For environment setup (venv, dependencies) and developer tooling, see the [root README](../README.md).
+Install dependencies from repository root:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
 ## Configuration
 
-Provide credentials via CLI flags or environment variables. `.env` is supported (see `.env.example`). Use the base URL of your OpenCTI; the server will automatically call the `/graphql` endpoint.
+You can pass credentials via CLI flags or environment variables (`.env` supported).
 
 ```bash
 cp .env.example .env
-# then edit .env to set OPENCTI_URL and OPENCTI_TOKEN
+# edit .env
+# OPENCTI_URL=https://your-opencti
+# OPENCTI_TOKEN=<token>
 ```
 
-- `OPENCTI_URL` – Base URL of your OpenCTI (e.g., `https://your-opencti`). The server appends `/graphql`.
-- `OPENCTI_TOKEN` – API token
+Variables:
+- `OPENCTI_URL`: OpenCTI base URL (the server appends `/graphql`)
+- `OPENCTI_TOKEN`: API token
+- `OPENCTI_ENABLE_MUTATIONS`: optional boolean (`true/false`, `1/0`, `yes/no`, `on/off`)
 
 ## Run
 
+### STDIO (default)
+
 ```bash
-# STDIO transport (default)
-python -m opencti_mcp.server --url "https://your-opencti/" --token "<token>"
+python -m opencti_mcp.server --url "https://your-opencti" --token "<token>"
+```
 
-# Explicitly select STDIO transport
-python -m opencti_mcp.server --transport stdio --url "https://your-opencti/" --token "<token>"
+### STDIO with mutations enabled
 
-# Streamable HTTP transport (recommended for remote / browser-based clients)
+```bash
 python -m opencti_mcp.server \
-  --transport streamable-http \
-  --host "127.0.0.1" \
-  --port 8000 \
-  --url "https://your-opencti/" \
-  --token "<token>"
-
-# SSE transport (legacy HTTP streaming)
-python -m opencti_mcp.server \
-  --transport sse \
-  --host "127.0.0.1" \
-  --port 8000 \
-  --url "https://your-opencti/" \
+  --enable-mutations \
+  --url "https://your-opencti" \
   --token "<token>"
 ```
 
-## MCP client configuration
+### Streamable HTTP
 
-Configure your MCP-enabled client to connect to this server. The JSON config differs depending on the transport.
+```bash
+python -m opencti_mcp.server \
+  --transport streamable-http \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --url "https://your-opencti" \
+  --token "<token>"
+```
 
-### STDIO (default)
+### SSE
 
-The client launches the server process automatically:
+```bash
+python -m opencti_mcp.server \
+  --transport sse \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --url "https://your-opencti" \
+  --token "<token>"
+```
+
+## MCP Client Config Examples
+
+### STDIO
 
 ```json
 {
@@ -61,7 +84,7 @@ The client launches the server process automatically:
       "command": "python",
       "args": ["-m", "opencti_mcp.server"],
       "env": {
-        "OPENCTI_URL": "https://your-opencti/",
+        "OPENCTI_URL": "https://your-opencti",
         "OPENCTI_TOKEN": "<token>"
       }
     }
@@ -69,42 +92,7 @@ The client launches the server process automatically:
 }
 ```
 
-Alternatively, you can omit `env` and pass flags via `args`, e.g.:
-
-```json
-{
-  "mcpServers": {
-    "opencti-graphql-mcp": {
-      "command": "python",
-      "args": [
-        "-m", "opencti_mcp.server",
-        "--url",
-        "https://your-opencti/",
-        "--token",
-        "<token>"
-      ]
-    }
-  }
-}
-```
-
-### SSE
-
-For SSE, the server must be started separately first (see the `--transport sse` command above). The client then connects to the running server:
-
-```json
-{
-  "mcpServers": {
-    "opencti-graphql-mcp": {
-      "url": "http://127.0.0.1:8000/sse"
-    }
-  }
-}
-```
-
 ### Streamable HTTP
-
-For streamable HTTP, the server must be started separately first (see the `--transport streamable-http` command above). The client then connects to the running server:
 
 ```json
 {
@@ -116,149 +104,120 @@ For streamable HTTP, the server must be started separately first (see the `--tra
 }
 ```
 
-## Testing the server
-
-After starting the server you can quickly verify each transport is working.
-
-### STDIO
-
-STDIO communicates over stdin/stdout pipes, so it cannot be tested with `curl`. You can pipe a JSON-RPC `initialize` message directly to the server process:
-
-```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' \
-  | python -m opencti_mcp.server --url "$OPENCTI_URL" --token "$OPENCTI_TOKEN"
-```
-
-A successful response is a JSON object containing `serverInfo` and `capabilities`.
-
-Alternatively, use the MCP Inspector:
-
-```bash
-npx @modelcontextprotocol/inspector
-```
-
 ### SSE
 
-With the server running on `--transport sse`, open the event stream with `curl`:
-
-```bash
-curl -N http://127.0.0.1:8000/sse
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "url": "http://127.0.0.1:8000/sse"
+    }
+  }
+}
 ```
 
-A successful connection immediately receives an `event: endpoint` line followed by a `data:` payload containing the message posting URL.
+## Mutation Safety
 
-### Streamable HTTP
+Mutation tools are exposed but blocked by default.
 
-With the server running on `--transport streamable-http`, send an `initialize` request:
+To enable them, use:
+- `--enable-mutations`, or
+- `OPENCTI_ENABLE_MUTATIONS=true`
 
-```bash
-curl -X POST http://127.0.0.1:8000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
-```
+Mutation tools:
+- `create_identity`
+- `create_label`
+- `create_external_reference`
+- `create_grouping`
+- `create_report`
+- `add_note`
+- `create_relationship`
 
-A successful response is a JSON object containing `serverInfo` and `capabilities`.
+## Available Tools
 
-> **Note:** A plain `GET http://127.0.0.1:8000/mcp` returns `406 Not Acceptable` — this is expected. The streamable HTTP protocol requires specific `Accept` and `Content-Type` headers (see above).
+### 1) Schema and Query Helpers
 
-### Automated test suite
+| Tool | Purpose |
+| --- | --- |
+| `list_graphql_types` | List all GraphQL types from introspection |
+| `get_types_definitions` | Return field definitions for one or several types |
+| `get_types_definitions_from_schema` | Parse OpenCTI `/schema` SDL and return all type definitions |
+| `get_query_fields` | List GraphQL `Query` fields and arguments |
+| `validate_graphql_query` | Validate a query string against OpenCTI |
+| `execute_graphql_query` | Execute a GraphQL query string |
+| `get_stix_relationships_mapping` | Return available STIX relationship mappings |
+| `get_entity_names` | Return unique entity names extracted from relationship mapping |
+| `search_entities_by_name` | Search entities by name and intersect with available entity types |
 
-The project includes an automated test suite that validates all three transports end-to-end with a mocked GraphQL backend (no real OpenCTI instance needed):
+Notes:
+- `execute_graphql_query` is query-oriented (it prepends `query` if missing).
+- For write operations, use dedicated mutation tools.
+
+### 2) Brand Posture Read Pack
+
+| Tool | Purpose |
+| --- | --- |
+| `get_license_edition` | Detect if instance is `CE` or `EE` |
+| `list_identities` | List brand/supplier/subsidiary identities |
+| `read_identity` | Read a single identity by ID |
+| `list_stix_core_objects` | List reports, campaigns, threat actors, malware, tools, vulnerabilities, etc. |
+| `read_stix_core_object` | Read one STIX Core Object by ID |
+| `list_stix_core_relationships` | List relationships for pivoting and explainability |
+| `read_stix_core_relationship` | Read one STIX Core Relationship by ID |
+| `list_marking_definitions` | List markings (TLP, statements, etc.) |
+| `read_marking_definition` | Read one marking definition by ID |
+| `list_labels` | List labels |
+| `read_label` | Read one label by ID |
+
+### 3) Brand Posture Publish Pack (mutations enabled)
+
+| Tool | Purpose |
+| --- | --- |
+| `create_identity` | Create an identity (organization, individual, system, etc.) |
+| `create_label` | Create a label |
+| `create_external_reference` | Create source references (advisory, case URL, portal, etc.) |
+| `create_grouping` | Bundle objects used in a pulse |
+| `create_report` | Create a report |
+| `add_note` | Create a note attached to one or more objects |
+| `create_relationship` | Create a STIX core relationship |
+
+## Typical Brand Pulse Flow
+
+1. Detect platform capabilities:
+   - `get_license_edition`
+2. Scope identities:
+   - `list_identities`
+   - `read_identity`
+3. Collect threat context:
+   - `list_stix_core_objects` (reports, campaigns, threat actors, malware, tools, vulnerabilities)
+   - `list_stix_core_relationships`
+4. Prepare classification:
+   - `list_marking_definitions`
+   - `list_labels`
+5. Publish pulse:
+   - `create_external_reference`
+   - `create_label` (optional)
+   - `create_grouping` (optional)
+   - `add_note` and/or `create_report`
+   - `create_relationship`
+
+## Testing
+
+From repository root:
 
 ```bash
 pip install -r requirements-dev.txt
 pytest tests/
 ```
 
-## Available tools
+## Notes on OpenCTI Schema Access
 
-- `list_graphql_types`: Fetch and return the list of all GraphQL types.
-  - Inputs: none
-  - Outputs: JSON array of type names
+- GraphQL introspection queries (`/graphql`) are commonly disabled in production OpenCTI.
+- `/schema` endpoint is available from OpenCTI 6.8+.
 
-- `get_types_definitions`: Fetch and return the definition of one or more GraphQL types.
-  - Inputs:
-    - `type_name` (required): string or JSON array (or JSON-stringified array) of type names
-  - Outputs: JSON array of objects, each shaped as `{ "<TypeName>": [{ "name": string, "type": string|null, "kind": string|null }] }`
-  - Errors: returns a text error message if `type_name` missing or of wrong type
+This server supports both:
+- Introspection-based tools: `list_graphql_types`, `get_types_definitions`, `get_query_fields`
+- SDL-based tool: `get_types_definitions_from_schema`
 
-- `get_types_definitions_from_schema`: Return all type definitions using `/schema`.
-  - Inputs: none (reads `OPENCTI_URL` and `OPENCTI_TOKEN` from environment/.env)
-  - Outputs: JSON object mapping type name to type definition (fields, queries, relationship_type, related_types)
-
-- `execute_graphql_query`: Execute a GraphQL query and return the result.
-  - Inputs:
-    - `query` (required): GraphQL query string; if it does not start with `query`, the server will prepend `query`
-  - Outputs: JSON object `{ "success": true, "data": <GraphQL result> }` on success
-  - Errors: JSON object `{ "success": false, "error": string }` on failure
-
-- `validate_graphql_query`: Validate a GraphQL query without returning its result.
-  - Inputs:
-    - `query` (required): GraphQL query string; if it does not start with `query`, the server will prepend `query`
-  - Outputs: JSON object `{ "success": true, "error": "" }` if the query validates and executes successfully
-  - Errors: JSON object `{ "success": false, "error": string }` if validation/execution fails
-
-- `get_stix_relationships_mapping`: Get all possible STIX relationships between types and their available relationship types.
-  - Inputs:
-    - `type_name` (optional): filter to a specific type name; if provided, returns only related entities for this type
-  - Outputs:
-    - With filter: JSON object `{ "filtered_type": string, "relationships_mapping": string[] }`
-    - Without filter: JSON object `{ "relationships_mapping": { [typeName: string]: string[] } }`
-
-- `get_query_fields`: Get all field names from the GraphQL `Query` type.
-  - Inputs: none
-  - Outputs: JSON object `{ "query_fields": [{ "name": string, "args": [{ "name": string, "type": string|null }] }] }` (sorted by field name)
-  - Errors: text error if the `Query` type is not found
-
-- `get_entity_names`: Get all unique entity names from STIX relationships mapping.
-  - Inputs: none
-  - Outputs: JSON object `{ "entity_names": string[], "count": number }`
-
-- `search_entities_by_name`: Search for entities by name and intersect with available entity types.
-  - Inputs:
-    - `entity_name` (required): non-empty string to search for
-  - Outputs: JSON array of entity type strings present in both search results and available schema types
-  - Errors: text error if `entity_name` missing or empty
-
-### Example output
-
-Example output for `list_graphql_types`:
-
-```json
-[
-  "AttackPattern",
-  "Campaign",
-  "Note",
-  "User"
-]
-```
-
-## Example Workflow
-
-A typical agent workflow proceeds as follows:
-
-1. Receive a question from the user.
-2. Analyze (introspect) the GraphQL schema to identify which types are relevant to the user's question.
-3. Retrieve the definitions of these types to understand their relevant fields.
-4. Construct a GraphQL query that can answer the user's question.
-5. Execute the query and return the response to the user.
-
-## Notes on schema access
-
-- GraphQL introspection queries (via `/graphql`) is disabled by default in OpenCTI.
-- The `/schema` endpoint is available from OpenCTI 6.8.0 onwards and returns the schema SDL.
-- This MCP supports both approaches:
-  - Tools that rely on `/graphql` introspection (e.g., `get_types_definitions`). In this case, the introspection queries should be activated in your OpenCTI setup.
-  - Tools that load SDL from `/schema` and introspect locally (e.g., `get_types_definitions_from_schema`)
-
-The following tools rely on GraphQL **introspection queries**:
-
-- `list_graphql_types`
-- `get_types_definitions`
-- `get_query_fields`
-
-Even though they are enabled by default, most OpenCTI environments disable **introspection queries**. To use these tools, check your OpenCTI configuration as described in the [relevant documentation](https://docs.opencti.io/latest/deployment/configuration/?h=introspection#technical-customization). Namely, you need the environment variables:
-
-* `APP__GRAPHQL__PLAYGROUND__FORCE_DISABLED_INTROSPECTION` set to `true` (default)
-* `APP__GRAPHQL__PLAYGROUND__ENABLED` set to `true` (default)
+If introspection tools fail, verify OpenCTI configuration as described in official docs:
+https://docs.opencti.io/latest/deployment/configuration/?h=introspection#technical-customization
