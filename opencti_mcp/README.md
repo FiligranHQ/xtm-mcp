@@ -129,6 +129,9 @@ Mutation tools:
 - `create_label`
 - `create_external_reference`
 - `create_grouping`
+- `create_pir`
+- `create_case_rfi`
+- `add_objects_to_case_rfi`
 - `create_report`
 - `add_note`
 - `create_relationship`
@@ -144,13 +147,14 @@ Mutation tools:
 | `get_types_definitions_from_schema` | Parse OpenCTI `/schema` SDL and return all type definitions |
 | `get_query_fields` | List GraphQL `Query` fields and arguments |
 | `validate_graphql_query` | Validate a query string against OpenCTI |
-| `execute_graphql_query` | Execute a GraphQL query string |
+| `execute_graphql_query` | Execute a GraphQL operation string (`query`, `mutation`, `subscription`) |
 | `get_stix_relationships_mapping` | Return available STIX relationship mappings |
 | `get_entity_names` | Return unique entity names extracted from relationship mapping |
 | `search_entities_by_name` | Search entities by name and intersect with available entity types |
 
 Notes:
-- `execute_graphql_query` is query-oriented (it prepends `query` if missing).
+- `execute_graphql_query` keeps explicit operation prefixes (`query`, `mutation`, `subscription`).
+- If no operation prefix is provided, `execute_graphql_query` prepends `query`.
 - For write operations, use dedicated mutation tools.
 
 ### 2) Brand Posture Read Pack
@@ -168,6 +172,10 @@ Notes:
 | `read_marking_definition` | Read one marking definition by ID |
 | `list_labels` | List labels |
 | `read_label` | Read one label by ID |
+| `list_pirs` | List priority intelligence requirements |
+| `read_pir` | Read one PIR by ID |
+| `list_case_rfis` | List case RFIs |
+| `read_case_rfi` | Read one case RFI by ID |
 
 ### 3) Brand Posture Publish Pack (mutations enabled)
 
@@ -177,6 +185,9 @@ Notes:
 | `create_label` | Create a label |
 | `create_external_reference` | Create source references (advisory, case URL, portal, etc.) |
 | `create_grouping` | Bundle objects used in a pulse |
+| `create_pir` | Create a PIR |
+| `create_case_rfi` | Create a case RFI |
+| `add_objects_to_case_rfi` | Attach one or more objects to a case RFI |
 | `create_report` | Create a report |
 | `add_note` | Create a note attached to one or more objects |
 | `create_relationship` | Create a STIX core relationship |

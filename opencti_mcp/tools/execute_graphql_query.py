@@ -1,37 +1,43 @@
-import json
+import re
 from typing import Any
 
 from gql import gql
 from mcp import types as mcp_types
 
+from opencti_mcp.tools.tool_helpers import (
+    ensure_arguments_dict,
+    error_response,
+    normalize_non_empty_string,
+    success_response,
+)
+
+_OPERATION_PREFIX_PATTERN = re.compile(r"^(query|mutation|subscription)\b", re.IGNORECASE)
+
+
+def _normalize_graphql_operation(query_string: str) -> str:
+    normalized = query_string.strip()
+    if _OPERATION_PREFIX_PATTERN.match(normalized):
+        return normalized
+    return f"query {normalized}"
+
 
 async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
-    if not isinstance(arguments, dict):
-        return [
-            mcp_types.TextContent(
-                type="text", text=f"Error: arguments must be a dictionary, got {type(arguments)}"
-            )
-        ]
+    args_error = ensure_arguments_dict(arguments)
+    if args_error:
+        return error_response(args_error)
 
-    query_string = arguments.get("query")
-    if not query_string:
-        return [
-            mcp_types.TextContent(type="text", text="Error: query parameter is missing or empty")
-        ]
+    query_string, query_error = normalize_non_empty_string(
+        arguments.get("query"),
+        "query",
+        required=True,
+    )
+    if query_error:
+        return error_response(query_error)
+    assert query_string is not None
 
     try:
-        if not query_string.strip().startswith("query"):
-            query_string = f"query {query_string}"
+        result = await session.execute(gql(_normalize_graphql_operation(query_string)))
+    except Exception as error:  # noqa: BLE001
+        return error_response(str(error))
 
-        result = await session.execute(gql(query_string))
-        return [
-            mcp_types.TextContent(
-                type="text", text=json.dumps({"success": True, "data": result}, indent=2)
-            )
-        ]
-    except Exception as e:  # noqa: BLE001
-        return [
-            mcp_types.TextContent(
-                type="text", text=json.dumps({"success": False, "error": str(e)}, indent=2)
-            )
-        ]
+    return success_response(result)

@@ -15,6 +15,12 @@ from opencti_mcp.tools import (
     add_note as add_note_tool,
 )
 from opencti_mcp.tools import (
+    add_objects_to_case_rfi as add_objects_to_case_rfi_tool,
+)
+from opencti_mcp.tools import (
+    create_case_rfi as create_case_rfi_tool,
+)
+from opencti_mcp.tools import (
     create_external_reference as create_external_reference_tool,
 )
 from opencti_mcp.tools import (
@@ -25,6 +31,9 @@ from opencti_mcp.tools import (
 )
 from opencti_mcp.tools import (
     create_label as create_label_tool,
+)
+from opencti_mcp.tools import (
+    create_pir as create_pir_tool,
 )
 from opencti_mcp.tools import (
     create_relationship as create_relationship_tool,
@@ -54,6 +63,9 @@ from opencti_mcp.tools import (
     get_types_definitions_from_schema as get_types_definitions_from_schema_tool,
 )
 from opencti_mcp.tools import (
+    list_case_rfis as list_case_rfis_tool,
+)
+from opencti_mcp.tools import (
     list_graphql_types as list_graphql_types_tool,
 )
 from opencti_mcp.tools import (
@@ -66,10 +78,16 @@ from opencti_mcp.tools import (
     list_marking_definitions as list_marking_definitions_tool,
 )
 from opencti_mcp.tools import (
+    list_pirs as list_pirs_tool,
+)
+from opencti_mcp.tools import (
     list_stix_core_objects as list_stix_core_objects_tool,
 )
 from opencti_mcp.tools import (
     list_stix_core_relationships as list_stix_core_relationships_tool,
+)
+from opencti_mcp.tools import (
+    read_case_rfi as read_case_rfi_tool,
 )
 from opencti_mcp.tools import (
     read_identity as read_identity_tool,
@@ -79,6 +97,9 @@ from opencti_mcp.tools import (
 )
 from opencti_mcp.tools import (
     read_marking_definition as read_marking_definition_tool,
+)
+from opencti_mcp.tools import (
+    read_pir as read_pir_tool,
 )
 from opencti_mcp.tools import (
     read_stix_core_object as read_stix_core_object_tool,
@@ -149,7 +170,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help=(
             "Enable write tools (create_report, add_note, create_relationship, "
-            "create_identity, create_grouping, create_external_reference, create_label). "
+            "create_identity, create_grouping, create_external_reference, create_label, "
+            "create_pir, create_case_rfi, add_objects_to_case_rfi). "
             "Mutations are disabled by default."
         ),
     )
@@ -454,6 +476,71 @@ async def read_label(
 
 
 @mcp_server.tool()
+async def list_pirs(
+    ctx: Context,
+    search: str | None = None,
+    first: int = 50,
+    after: str | None = None,
+    orderBy: str | None = None,  # noqa: N803
+    orderMode: str | None = None,  # noqa: N803
+) -> list[mcp_types.TextContent]:
+    """List PIRs with optional filters."""
+    arguments: dict[str, Any] = {"first": first}
+    if search is not None:
+        arguments["search"] = search
+    if after is not None:
+        arguments["after"] = after
+    if orderBy is not None:
+        arguments["orderBy"] = orderBy
+    if orderMode is not None:
+        arguments["orderMode"] = orderMode
+    return await _with_session(ctx, list_pirs_tool.handle, arguments)
+
+
+@mcp_server.tool()
+async def read_pir(
+    ctx: Context,
+    id: str,  # noqa: A002
+) -> list[mcp_types.TextContent]:
+    """Read one PIR by OpenCTI ID."""
+    return await _with_session(ctx, read_pir_tool.handle, {"id": id})
+
+
+@mcp_server.tool()
+async def list_case_rfis(
+    ctx: Context,
+    search: str | None = None,
+    first: int = 50,
+    after: str | None = None,
+    orderBy: str | None = None,  # noqa: N803
+    orderMode: str | None = None,  # noqa: N803
+    pir_id: str | None = None,
+) -> list[mcp_types.TextContent]:
+    """List case RFIs with optional filters."""
+    arguments: dict[str, Any] = {"first": first}
+    if search is not None:
+        arguments["search"] = search
+    if after is not None:
+        arguments["after"] = after
+    if orderBy is not None:
+        arguments["orderBy"] = orderBy
+    if orderMode is not None:
+        arguments["orderMode"] = orderMode
+    if pir_id is not None:
+        arguments["pir_id"] = pir_id
+    return await _with_session(ctx, list_case_rfis_tool.handle, arguments)
+
+
+@mcp_server.tool()
+async def read_case_rfi(
+    ctx: Context,
+    id: str,  # noqa: A002
+) -> list[mcp_types.TextContent]:
+    """Read one case RFI by OpenCTI ID."""
+    return await _with_session(ctx, read_case_rfi_tool.handle, {"id": id})
+
+
+@mcp_server.tool()
 async def create_identity(
     ctx: Context,
     name: str,
@@ -565,6 +652,100 @@ async def create_label(
     if color is not None:
         arguments["color"] = color
     return await _with_session(ctx, create_label_tool.handle, arguments)
+
+
+@mcp_server.tool()
+async def create_pir(
+    ctx: Context,
+    name: str,
+    description: str | None = None,
+    content: str | None = None,
+    priority: str | None = None,
+    severity: str | None = None,
+    confidence: int = 80,
+    object_marking: list[str] | None = None,
+    object_label: list[str] | None = None,
+    external_references: list[str] | None = None,
+    objects: list[str] | None = None,
+    update: bool = False,
+) -> list[mcp_types.TextContent]:
+    """Create a PIR in OpenCTI."""
+    arguments: dict[str, Any] = {
+        "name": name,
+        "confidence": confidence,
+        "update": update,
+    }
+    if description is not None:
+        arguments["description"] = description
+    if content is not None:
+        arguments["content"] = content
+    if priority is not None:
+        arguments["priority"] = priority
+    if severity is not None:
+        arguments["severity"] = severity
+    if object_marking is not None:
+        arguments["object_marking"] = object_marking
+    if object_label is not None:
+        arguments["object_label"] = object_label
+    if external_references is not None:
+        arguments["external_references"] = external_references
+    if objects is not None:
+        arguments["objects"] = objects
+    return await _with_session(ctx, create_pir_tool.handle, arguments)
+
+
+@mcp_server.tool()
+async def create_case_rfi(
+    ctx: Context,
+    name: str,
+    description: str | None = None,
+    content: str | None = None,
+    severity: str | None = None,
+    pir_id: str | None = None,
+    confidence: int = 80,
+    object_marking: list[str] | None = None,
+    object_label: list[str] | None = None,
+    external_references: list[str] | None = None,
+    objects: list[str] | None = None,
+    update: bool = False,
+) -> list[mcp_types.TextContent]:
+    """Create a case RFI in OpenCTI."""
+    arguments: dict[str, Any] = {
+        "name": name,
+        "confidence": confidence,
+        "update": update,
+    }
+    if description is not None:
+        arguments["description"] = description
+    if content is not None:
+        arguments["content"] = content
+    if severity is not None:
+        arguments["severity"] = severity
+    if pir_id is not None:
+        arguments["pir_id"] = pir_id
+    if object_marking is not None:
+        arguments["object_marking"] = object_marking
+    if object_label is not None:
+        arguments["object_label"] = object_label
+    if external_references is not None:
+        arguments["external_references"] = external_references
+    if objects is not None:
+        arguments["objects"] = objects
+    return await _with_session(ctx, create_case_rfi_tool.handle, arguments)
+
+
+@mcp_server.tool()
+async def add_objects_to_case_rfi(
+    ctx: Context,
+    id: str,  # noqa: A002
+    object_ids: list[str],
+) -> list[mcp_types.TextContent]:
+    """Add one or more objects to an existing case RFI."""
+    return await _with_session(
+        ctx,
+        add_objects_to_case_rfi_tool.handle,
+        {"id": id, "object_ids": object_ids},
+    )
 
 
 @mcp_server.tool()

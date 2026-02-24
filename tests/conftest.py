@@ -36,11 +36,18 @@ EXPECTED_TOOL_NAMES: set[str] = {
     "read_marking_definition",
     "list_labels",
     "read_label",
+    "list_pirs",
+    "read_pir",
+    "list_case_rfis",
+    "read_case_rfi",
     "search_entities_by_name",
     "create_identity",
     "create_grouping",
     "create_external_reference",
     "create_label",
+    "create_pir",
+    "create_case_rfi",
+    "add_objects_to_case_rfi",
     "create_report",
     "add_note",
     "create_relationship",
@@ -228,6 +235,41 @@ def _register_tools(server: FastMCP) -> None:
         """Read one label by ID."""
         return await _echo_via_context(ctx)
 
+    @server.tool(name="list_pirs")
+    async def list_pirs(
+        ctx: Context,
+        search: str | None = None,
+        first: int = 50,
+        after: str | None = None,
+        orderBy: str | None = None,  # noqa: N803
+        orderMode: str | None = None,  # noqa: N803
+    ) -> list[mcp_types.TextContent]:
+        """List PIRs with optional filters."""
+        return await _echo_via_context(ctx)
+
+    @server.tool(name="read_pir")
+    async def read_pir(ctx: Context, id: str) -> list[mcp_types.TextContent]:  # noqa: A002
+        """Read one PIR by ID."""
+        return await _echo_via_context(ctx)
+
+    @server.tool(name="list_case_rfis")
+    async def list_case_rfis(
+        ctx: Context,
+        search: str | None = None,
+        first: int = 50,
+        after: str | None = None,
+        orderBy: str | None = None,  # noqa: N803
+        orderMode: str | None = None,  # noqa: N803
+        pir_id: str | None = None,
+    ) -> list[mcp_types.TextContent]:
+        """List case RFIs with optional filters."""
+        return await _echo_via_context(ctx)
+
+    @server.tool(name="read_case_rfi")
+    async def read_case_rfi(ctx: Context, id: str) -> list[mcp_types.TextContent]:  # noqa: A002
+        """Read one case RFI by ID."""
+        return await _echo_via_context(ctx)
+
     @server.tool(name="execute_graphql_query")
     async def execute_graphql_query(ctx: Context, query: str) -> list[mcp_types.TextContent]:
         """Execute a GraphQL query and return the result."""
@@ -353,6 +395,51 @@ def _register_tools(server: FastMCP) -> None:
         update: bool = False,
     ) -> list[mcp_types.TextContent]:
         """Create a label."""
+        return await _echo_via_context(ctx)
+
+    @server.tool(name="create_pir")
+    async def create_pir(
+        ctx: Context,
+        name: str,
+        description: str | None = None,
+        content: str | None = None,
+        priority: str | None = None,
+        severity: str | None = None,
+        confidence: int = 80,
+        object_marking: list[str] | None = None,
+        object_label: list[str] | None = None,
+        external_references: list[str] | None = None,
+        objects: list[str] | None = None,
+        update: bool = False,
+    ) -> list[mcp_types.TextContent]:
+        """Create a PIR."""
+        return await _echo_via_context(ctx)
+
+    @server.tool(name="create_case_rfi")
+    async def create_case_rfi(
+        ctx: Context,
+        name: str,
+        description: str | None = None,
+        content: str | None = None,
+        severity: str | None = None,
+        pir_id: str | None = None,
+        confidence: int = 80,
+        object_marking: list[str] | None = None,
+        object_label: list[str] | None = None,
+        external_references: list[str] | None = None,
+        objects: list[str] | None = None,
+        update: bool = False,
+    ) -> list[mcp_types.TextContent]:
+        """Create a case RFI."""
+        return await _echo_via_context(ctx)
+
+    @server.tool(name="add_objects_to_case_rfi")
+    async def add_objects_to_case_rfi(
+        ctx: Context,
+        id: str,  # noqa: A002
+        object_ids: list[str],
+    ) -> list[mcp_types.TextContent]:
+        """Add objects to a case RFI."""
         return await _echo_via_context(ctx)
 
 
