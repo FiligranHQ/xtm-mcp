@@ -162,6 +162,114 @@ A successful response is a JSON object containing `serverInfo` and `capabilities
 
 > **Note:** A plain `GET http://127.0.0.1:8000/mcp` returns `406 Not Acceptable` — this is expected. The streamable HTTP protocol requires specific `Accept` and `Content-Type` headers (see above).
 
+
+### Docker
+
+You can also run the server in a Docker container. A full docker compose example is avalaible with OpenWebUI
+
+```bash
+docker compose up -d
+```
+
+Then go to `http://localhost:3000` to reach the OpenWebUI interface.
+
+In `http://localhost:3000/admin/settings/tools` add the connection to the MCP server with the following configuration:
+
+(you can use import functionality to import the JSON below)
+
+```json
+[
+  {
+    "type": "mcp",
+    "url": "http://xtm-mcp:8000/mcp",
+    "spec_type": "url",
+    "spec": "",
+    "path": "openapi.json",
+    "auth_type": "none",
+    "headers": {
+      "Content-Type": "application/json",
+      "Accept": "application/json, text/event-stream"
+    },
+    "key": "",
+    "info": {
+      "id": "test-id",
+      "name": "open-cti-mcp",
+      "description": "Get data from the connected OpenCTI platform"
+    }
+  }
+]
+```
+
+Then in http://localhost:3000/workspace/models, create a new model and add the tool "open-cti-mcp" to it.
+You can use the import functionnality to import the JSON below:
+
+```json
+[
+  {
+    "id": "octi-helper",
+    "user_id": "af04339a-9b98-4eb7-8845-be415d9c73a7",
+    "base_model_id": "gpt-4.1-mini",
+    "name": "OCTI helper",
+    "params": {
+      "system": "You are a helpful assistant with strong knowledge in Cyber Threat Intel able to reply query about the linked opencti content.\nYou must use the open-cti-mcp provided tools to answer. This is mandatory\n",
+      "function_calling": "native"
+    },
+    "meta": {
+      "profile_image_url": "/static/favicon.png",
+      "description": "Helper for OpenCTI",
+      "capabilities": {
+        "file_context": true,
+        "vision": true,
+        "file_upload": true,
+        "web_search": true,
+        "image_generation": true,
+        "code_interpreter": true,
+        "citations": true,
+        "status_updates": true,
+        "builtin_tools": true
+      },
+      "suggestion_prompts": null,
+      "tags": [],
+      "toolIds": ["server:mcp:test-id"],
+      "builtinTools": {
+        "time": true,
+        "memory": true,
+        "chats": true,
+        "notes": true,
+        "knowledge": true,
+        "channels": true,
+        "web_search": true,
+        "image_generation": true,
+        "code_interpreter": true
+      }
+    },
+    "access_grants": [
+      {
+        "id": "765c451b-8855-4a0f-8c86-2a82fbb06eb3",
+        "resource_type": "model",
+        "resource_id": "octi-helper",
+        "principal_type": "user",
+        "principal_id": "*",
+        "permission": "read",
+        "created_at": 1772027805
+      }
+    ],
+    "is_active": true,
+    "updated_at": 1772026171,
+    "created_at": 1772026171,
+    "user": {
+      "id": "af04339a-9b98-4eb7-8845-be415d9c73a7",
+      "name": "test",
+      "role": "admin",
+      "email": "test@example.com"
+    },
+    "write_access": true
+  }
+]
+```
+
+Now you can chat with the model and it will use the MCP server to retrieve data from OpenCTI.
+
 ### Automated test suite
 
 The project includes an automated test suite that validates all three transports end-to-end with a mocked GraphQL backend (no real OpenCTI instance needed):
