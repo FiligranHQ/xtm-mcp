@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any
 
 from gql import gql
 from mcp import types as mcp_types
@@ -16,6 +16,15 @@ _MUTATIONS_DISABLED_MESSAGE = (
     "Mutations are disabled. Start the server with --enable-mutations "
     "or set OPENCTI_ENABLE_MUTATIONS=true."
 )
+
+_STIX_REF_RELATIONSHIP_ADD_MUTATION = """
+mutation AddObjectToCaseRfi($input: StixRefRelationshipAddInput!) {
+  result: stixRefRelationshipAdd(input: $input) {
+    id
+    relationship_type
+  }
+}
+"""
 
 _CASE_RFI_EDIT_RELATION_MUTATION = """
 mutation AddObjectToCaseRfi($id: String!, $input: StixRefRelationshipAddInput!) {
@@ -37,14 +46,18 @@ mutation AddObjectToCaseRfi($id: String!, $input: RelationAddInput!) {
 }
 """
 
-_GENERIC_RELATIONSHIP_MUTATION = """
-mutation AddObjectToCaseRfi($input: StixCoreRelationshipAddInput!) {
-  result: stixCoreRelationshipAdd(input: $input) {
-    id
-    relationship_type
-  }
-}
-"""
+
+def _build_stix_ref_relationship_variables(
+    case_rfi_id: str,
+    object_id: str,
+) -> dict[str, Any]:
+    return {
+        "input": {
+            "fromId": case_rfi_id,
+            "toId": object_id,
+            "relationship_type": "object",
+        },
+    }
 
 
 def _build_case_rfi_relation_variables(
@@ -61,57 +74,44 @@ def _build_case_rfi_relation_variables(
     }
 
 
-def _build_generic_relationship_variables(
-    case_rfi_id: str,
-    object_id: str,
-    relationship_key: str,
-) -> dict[str, Any]:
-    return {
-        "input": {
-            "fromId": case_rfi_id,
-            "toId": object_id,
-            relationship_key: "object",
-        },
-    }
-
-
 def _mutation_candidates(case_rfi_id: str, object_id: str) -> list[tuple[str, dict[str, Any]]]:
-    variable_builders: list[tuple[str, Callable[[str, str, str], dict[str, Any]], str]] = [
-        (
-            _CASE_RFI_EDIT_RELATION_MUTATION,
-            _build_case_rfi_relation_variables,
-            "relationship_type",
-        ),
-        (
-            _CASE_RFI_EDIT_RELATION_MUTATION,
-            _build_case_rfi_relation_variables,
-            "relationshipType",
-        ),
-        (
-            _CASE_RFI_EDIT_RELATION_MUTATION_ALT,
-            _build_case_rfi_relation_variables,
-            "relationship_type",
-        ),
-        (
-            _CASE_RFI_EDIT_RELATION_MUTATION_ALT,
-            _build_case_rfi_relation_variables,
-            "relationshipType",
-        ),
-        (
-            _GENERIC_RELATIONSHIP_MUTATION,
-            _build_generic_relationship_variables,
-            "relationship_type",
-        ),
-        (
-            _GENERIC_RELATIONSHIP_MUTATION,
-            _build_generic_relationship_variables,
-            "relationshipType",
-        ),
-    ]
-
     return [
-        (mutation, builder(case_rfi_id, object_id, relationship_key))
-        for mutation, builder, relationship_key in variable_builders
+        (
+            _STIX_REF_RELATIONSHIP_ADD_MUTATION,
+            _build_stix_ref_relationship_variables(case_rfi_id, object_id),
+        ),
+        (
+            _CASE_RFI_EDIT_RELATION_MUTATION,
+            _build_case_rfi_relation_variables(
+                case_rfi_id,
+                object_id,
+                "relationship_type",
+            ),
+        ),
+        (
+            _CASE_RFI_EDIT_RELATION_MUTATION,
+            _build_case_rfi_relation_variables(
+                case_rfi_id,
+                object_id,
+                "relationshipType",
+            ),
+        ),
+        (
+            _CASE_RFI_EDIT_RELATION_MUTATION_ALT,
+            _build_case_rfi_relation_variables(
+                case_rfi_id,
+                object_id,
+                "relationship_type",
+            ),
+        ),
+        (
+            _CASE_RFI_EDIT_RELATION_MUTATION_ALT,
+            _build_case_rfi_relation_variables(
+                case_rfi_id,
+                object_id,
+                "relationshipType",
+            ),
+        ),
     ]
 
 

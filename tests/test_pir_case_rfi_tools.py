@@ -51,13 +51,18 @@ async def test_add_objects_to_case_rfi_is_blocked_when_mutations_disabled(monkey
 async def test_create_pir_executes_when_mutations_enabled(monkeypatch):
     monkeypatch.setenv("OPENCTI_ENABLE_MUTATIONS", "true")
     session = AsyncMock()
-    session.execute.return_value = {"result": {"id": "pir--1", "name": "PIR A"}}
+    session.execute.return_value = {"pirAdd": {"id": "pir--1", "name": "PIR A"}}
 
     result = await create_pir_tool.handle(session, {"name": "PIR A", "description": "Desc"})
 
     payload = json.loads(result[0].text)
     assert payload == {"success": True, "data": {"id": "pir--1", "name": "PIR A"}}
-    assert session.execute.await_count >= 1
+    assert session.execute.await_count == 1
+    sent_input = session.execute.await_args.kwargs["variable_values"]["input"]
+    assert sent_input["name"] == "PIR A"
+    assert sent_input["pir_type"] == "THREAT_CUSTOM"
+    assert sent_input["pir_rescan_days"] == 30
+    assert sent_input["pir_criteria"][0]["weight"] == 1
 
 
 async def test_create_case_rfi_executes_when_mutations_enabled(monkeypatch):
