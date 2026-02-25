@@ -1,0 +1,194 @@
+# Docker Compose for local development with OCTI and XTM MCP
+services:
+  
+  # OCTI Services
+  octi-redis:
+    image: redis:8.2.1
+    volumes:
+      - octi-redisdata4:/data
+    networks:
+      - dev-xtm-mcp
+
+  octi-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.3
+    volumes:
+      - octi-esdata4:/usr/share/elasticsearch/data
+      - octi-essnapshots:/usr/share/elasticsearch/snapshots
+    environment:
+      # Comment-out the line below for a cluster of multiple nodes
+      - discovery.type=single-node
+      # Uncomment the line below below for a cluster of multiple nodes
+      # - cluster.name=docker-cluster
+      - xpack.ml.enabled=false
+      - xpack.security.enabled=false
+      - thread_pool.search.queue_size=5000
+      - logger.org.elasticsearch.discovery="INFO"
+      - "ES_JAVA_OPTS=-Xms${OCTI__ELASTIC__MEMORY_SIZE:-2g} -Xmx${OCTI__ELASTIC__MEMORY_SIZE:-2g}"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - dev-xtm-mcp
+
+
+  octi-minio:
+    image: minio/minio:latest
+    volumes:
+      - octi-s3data4:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+      - "35300:35300"
+    environment:
+      MINIO_ROOT_USER: ${OCTI__MINIO__ROOT_USER:-opencti}
+      MINIO_ROOT_PASSWORD: ${OCTI__MINIO__ROOT_PASSWORD:-adminopencti}    
+    command: server /data
+    networks:
+      - dev-xtm-mcp
+
+
+  octi-rabbitmq:
+    image: rabbitmq:4.1-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=${OCTI__RABBITMQ__DEFAULT_USER:-opencti}
+      - RABBITMQ_DEFAULT_PASS=${OCTI__RABBITMQ__DEFAULT_PASS:-adminopencti}
+      - RABBITMQ_NODENAME=rabbit01@localhost
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - octi-amqpdata4:/var/lib/rabbitmq
+    networks:
+      - dev-xtm-mcp
+
+
+  opencti:
+    image: opencti/platform:6.8.5
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=8096
+      - APP__PORT=8080
+      - APP__BASE_URL=http://opencti:8080
+      - APP__ADMIN__EMAIL=${OCTI__ADMIN_EMAIL:-admin@opencti.io}
+      - APP__ADMIN__PASSWORD=${OCTI__ADMIN__PASSWORD:-admin}
+      - APP__ADMIN__TOKEN=${OCTI__ADMIN__TOKEN:-d434ce02-e58e-4cac-8b4c-42bf16748e84}
+      - APP__APP_LOGS__LOGS_LEVEL=debug
+      - REDIS__HOSTNAME=octi-redis
+      - REDIS__PORT=6379
+      - ELASTICSEARCH__URL=http://octi-elasticsearch:9200
+      - MINIO__ENDPOINT=octi-minio
+      - MINIO__PORT=9000
+      - MINIO__USE_SSL=false
+      - MINIO__ACCESS_KEY=${OCTI__MINIO__ROOT_USER:-opencti}
+      - MINIO__SECRET_KEY=${OCTI__MINIO__ROOT_PASSWORD:-adminopencti}
+      - RABBITMQ__HOSTNAME=octi-rabbitmq
+      - RABBITMQ__PORT=5672
+      - RABBITMQ__PORT_MANAGEMENT=15672
+      - RABBITMQ__MANAGEMENT_SSL=false
+      - RABBITMQ__USERNAME=${OCTI__RABBITMQ__DEFAULT_USER:-opencti}
+      - RABBITMQ__PASSWORD=${OCTI__RABBITMQ__DEFAULT_PASS:-adminopencti}
+      - SMTP__HOSTNAME=${OCTI__SMTP__HOSTNAME:-localhost}
+      - SMTP__PORT=25
+      - PROVIDERS__LOCAL__STRATEGY=LocalStrategy
+      - XTM__XTM_ONE_URL=http://kong:8000
+      - APP__ENTERPRISE_EDITION_LICENSE=${OCTI__ENTERPRISE_LICENSE}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - octi-redis
+      - octi-elasticsearch
+      - octi-minio
+      - octi-rabbitmq  
+    networks:
+      - dev-xtm-mcp
+
+    restart: unless-stopped
+    
+  octi-worker:
+    image: opencti/worker:6.8.5
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OCTI__ADMIN__TOKEN:-d434ce02-e58e-4cac-8b4c-42bf16748e84}
+      - WORKER_LOG_LEVEL=info
+    depends_on:
+      - opencti
+    deploy:
+      mode: replicated
+      replicas: 1
+    networks:
+      - dev-xtm-mcp
+    restart: unless-stopped
+
+
+  # Convenient worker to import STIX2 files into OpenCTI:
+  # * https://github.com/OpenCTI-Platform/opencti/blob/master/opencti-platform/opencti-graphql/tests/data/poisonivy.json
+  # * https://github.com/OpenCTI-Platform/opencti/blob/master/opencti-platform/opencti-graphql/tests/data/DATA-TEST-STIX2_v2.json
+  octi-connector-import-file-stix:
+    image: opencti/connector-import-file-stix:6.8.5
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OCTI__ADMIN__TOKEN:-d434ce02-e58e-4cac-8b4c-42bf16748e84}
+      - CONNECTOR_TYPE=INTERNAL_IMPORT_FILE
+      - CONNECTOR_ID=b0f89ad0-46c7-41ee-aa4f-4ca03120a4a2
+      - CONNECTOR_NAME=ImportFileStix
+      - CONNECTOR_VALIDATE_BEFORE_IMPORT=true # Validate any bundle before import
+      - CONNECTOR_SCOPE=application/json,application/xml
+      - CONNECTOR_LOG_LEVEL=info
+      - CONNECTOR_AUTO=true # Enable/disable auto-import of file
+    networks:
+      - dev-xtm-mcp
+    depends_on:
+      - opencti
+    restart: unless-stopped
+    
+  xtm-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OCTI__ADMIN__TOKEN:-d434ce02-e58e-4cac-8b4c-42bf16748e84}
+    ports:
+      - "8000:8000"
+    networks:
+      - dev-xtm-mcp
+    depends_on:
+      - opencti
+    restart: unless-stopped
+
+  # Chat UI — browse to http://localhost:3000
+  # 1. Login (default: admin / create on first run)
+  # http://localhost:3000/admin/settings/general
+  # 2. Set your LLM: Admin → Settings → Connections → add OpenAI-compatible endpoint + API key
+  # 3. Add MCP server: Admin → Tools → Add MCP Server → URL = http://xtm-mcp:8000/mcp
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.8.5
+    environment:
+      - ENABLE_MCP_SERVERS=true
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - open-webui-data:/app/backend/data
+    ports:
+      - "3000:8080"
+    networks:
+      - dev-xtm-mcp
+    depends_on:
+      - xtm-mcp
+    restart: unless-stopped
+
+networks:
+  dev-xtm-mcp:
+    driver: bridge
+volumes:
+  octi-esdata4:
+  octi-essnapshots:
+  octi-s3data4:
+  octi-amqpdata4:
+  octi-redisdata4:
+  open-webui-data:
