@@ -1,10 +1,17 @@
-import json
 from typing import Any
 
 from gql import gql
 from mcp import types as mcp_types
 
 from opencti_mcp.graphql_queries import ADD_NOTE_MUTATION
+from opencti_mcp.tools.tool_helpers import (
+    ensure_arguments_dict,
+    error_response,
+    normalize_confidence,
+    normalize_non_empty_string,
+    normalize_string_list,
+    success_response,
+)
 from opencti_mcp.utils.mutations import mutations_enabled
 
 _MUTATIONS_DISABLED_MESSAGE = (
@@ -13,90 +20,42 @@ _MUTATIONS_DISABLED_MESSAGE = (
 )
 
 
-def _error_response(message: str) -> list[mcp_types.TextContent]:
-    return [
-        mcp_types.TextContent(
-            type="text",
-            text=json.dumps({"success": False, "error": message}, indent=2),
-        )
-    ]
-
-
-def _success_response(data: Any) -> list[mcp_types.TextContent]:
-    return [
-        mcp_types.TextContent(
-            type="text",
-            text=json.dumps({"success": True, "data": data}, indent=2),
-        )
-    ]
-
-
-def _normalize_string_list(
-    value: Any, field_name: str, *, required: bool = False
-) -> tuple[list[str] | None, str | None]:
-    if value is None:
-        if required:
-            return None, f"{field_name} is required"
-        return None, None
-
-    if not isinstance(value, list):
-        return None, f"{field_name} must be a list of strings"
-
-    normalized: list[str] = []
-    for item in value:
-        if not isinstance(item, str):
-            return None, f"{field_name} must only contain strings"
-        cleaned = item.strip()
-        if not cleaned:
-            return None, f"{field_name} cannot contain empty strings"
-        normalized.append(cleaned)
-
-    if required and not normalized:
-        return None, f"{field_name} cannot be empty"
-
-    return normalized, None
-
-
-def _normalize_confidence(value: Any) -> tuple[int | None, str | None]:
-    if value is None:
-        return 80, None
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None, "confidence must be an integer between 0 and 100"
-    if value < 0 or value > 100:
-        return None, "confidence must be an integer between 0 and 100"
-    return value, None
-
-
 async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     if not mutations_enabled():
-        return _error_response(_MUTATIONS_DISABLED_MESSAGE)
+        return error_response(_MUTATIONS_DISABLED_MESSAGE)
 
-    if not isinstance(arguments, dict):
-        return _error_response(f"arguments must be a dictionary, got {type(arguments)}")
+    args_error = ensure_arguments_dict(arguments)
+    if args_error:
+        return error_response(args_error)
 
-    content_raw = arguments.get("content")
-    if not isinstance(content_raw, str) or not content_raw.strip():
-        return _error_response("content is required and must be a non-empty string")
-    content = content_raw.strip()
+    content, content_error = normalize_non_empty_string(
+        arguments.get("content"),
+        "content",
+        required=True,
+    )
+    if content_error:
+        return error_response(content_error)
+    assert content is not None
 
-    objects, objects_error = _normalize_string_list(
+    objects, objects_error = normalize_string_list(
         arguments.get("objects"),
         "objects",
         required=True,
     )
     if objects_error:
-        return _error_response(objects_error)
-    assert objects is not None  # appease type checker after required=True
+        return error_response(objects_error)
+    assert objects is not None
 
-    note_types, note_types_error = _normalize_string_list(arguments.get("note_types"), "note_types")
+    note_types, note_types_error = normalize_string_list(arguments.get("note_types"), "note_types")
     if note_types_error:
-        return _error_response(note_types_error)
+        return error_response(note_types_error)
     if note_types is None:
         note_types = ["external"]
 
-    confidence, confidence_error = _normalize_confidence(arguments.get("confidence"))
+    confidence, confidence_error = normalize_confidence(arguments.get("confidence"), default=80)
     if confidence_error:
-        return _error_response(confidence_error)
+        return error_response(confidence_error)
+    assert confidence is not None
 
     input_payload: dict[str, Any] = {
         "content": content,
@@ -105,13 +64,17 @@ async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.Text
         "confidence": confidence,
     }
 
-    attribute_abstract = arguments.get("attribute_abstract")
-    if attribute_abstract is not None:
-        if not isinstance(attribute_abstract, str) or not attribute_abstract.strip():
-            return _error_response(
-                "attribute_abstract must be a non-empty string when provided"
-            )
-        input_payload["attribute_abstract"] = attribute_abstract.strip()
+    attribute_abstract_raw = arguments.get("attribute_abstract")
+    attribute_abstract, attribute_abstract_error = normalize_non_empty_string(
+        attribute_abstract_raw,
+        "attribute_abstract",
+    )
+    if attribute_abstract_error:
+        return error_response(attribute_abstract_error)
+    if attribute_abstract_raw is not None and attribute_abstract is None:
+        return error_response("attribute_abstract must be a non-empty string when provided")
+    if attribute_abstract:
+        input_payload["attribute_abstract"] = attribute_abstract
 
     try:
         result = await session.execute(
@@ -119,7 +82,7 @@ async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.Text
             variable_values={"input": input_payload},
         )
     except Exception as error:  # noqa: BLE001
-        return _error_response(str(error))
+        return error_response(str(error))
 
     note_data = result.get("noteAdd", {})
-    return _success_response(note_data)
+    return success_response(note_data)

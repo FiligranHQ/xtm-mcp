@@ -1,10 +1,17 @@
-import json
 from typing import Any
 
 from gql import gql
 from mcp import types as mcp_types
 
 from opencti_mcp.graphql_queries import CREATE_REPORT_MUTATION
+from opencti_mcp.tools.tool_helpers import (
+    ensure_arguments_dict,
+    error_response,
+    normalize_confidence,
+    normalize_non_empty_string,
+    normalize_string_list,
+    success_response,
+)
 from opencti_mcp.utils.mutations import mutations_enabled
 
 _MUTATIONS_DISABLED_MESSAGE = (
@@ -13,97 +20,49 @@ _MUTATIONS_DISABLED_MESSAGE = (
 )
 
 
-def _error_response(message: str) -> list[mcp_types.TextContent]:
-    return [
-        mcp_types.TextContent(
-            type="text",
-            text=json.dumps({"success": False, "error": message}, indent=2),
-        )
-    ]
-
-
-def _success_response(data: Any) -> list[mcp_types.TextContent]:
-    return [
-        mcp_types.TextContent(
-            type="text",
-            text=json.dumps({"success": True, "data": data}, indent=2),
-        )
-    ]
-
-
-def _normalize_string_list(
-    value: Any, field_name: str, *, required: bool = False
-) -> tuple[list[str] | None, str | None]:
-    if value is None:
-        if required:
-            return None, f"{field_name} is required"
-        return None, None
-
-    if not isinstance(value, list):
-        return None, f"{field_name} must be a list of strings"
-
-    normalized: list[str] = []
-    for item in value:
-        if not isinstance(item, str):
-            return None, f"{field_name} must only contain strings"
-        cleaned = item.strip()
-        if not cleaned:
-            return None, f"{field_name} cannot contain empty strings"
-        normalized.append(cleaned)
-
-    if required and not normalized:
-        return None, f"{field_name} cannot be empty"
-
-    return normalized, None
-
-
-def _normalize_confidence(value: Any) -> tuple[int | None, str | None]:
-    if value is None:
-        return 80, None
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None, "confidence must be an integer between 0 and 100"
-    if value < 0 or value > 100:
-        return None, "confidence must be an integer between 0 and 100"
-    return value, None
-
-
 async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     if not mutations_enabled():
-        return _error_response(_MUTATIONS_DISABLED_MESSAGE)
+        return error_response(_MUTATIONS_DISABLED_MESSAGE)
 
-    if not isinstance(arguments, dict):
-        return _error_response(f"arguments must be a dictionary, got {type(arguments)}")
+    args_error = ensure_arguments_dict(arguments)
+    if args_error:
+        return error_response(args_error)
 
-    name_raw = arguments.get("name")
-    if not isinstance(name_raw, str) or not name_raw.strip():
-        return _error_response("name is required and must be a non-empty string")
-    name = name_raw.strip()
+    name, name_error = normalize_non_empty_string(arguments.get("name"), "name", required=True)
+    if name_error:
+        return error_response(name_error)
+    assert name is not None
 
-    description_raw = arguments.get("description")
-    if not isinstance(description_raw, str) or not description_raw.strip():
-        return _error_response("description is required and must be a non-empty string")
-    description = description_raw.strip()
+    description, description_error = normalize_non_empty_string(
+        arguments.get("description"),
+        "description",
+        required=True,
+    )
+    if description_error:
+        return error_response(description_error)
+    assert description is not None
 
-    report_types, report_types_error = _normalize_string_list(
+    report_types, report_types_error = normalize_string_list(
         arguments.get("report_types"),
         "report_types",
     )
     if report_types_error:
-        return _error_response(report_types_error)
+        return error_response(report_types_error)
     if report_types is None:
         report_types = ["threat-report"]
 
-    confidence, confidence_error = _normalize_confidence(arguments.get("confidence"))
+    confidence, confidence_error = normalize_confidence(arguments.get("confidence"), default=80)
     if confidence_error:
-        return _error_response(confidence_error)
+        return error_response(confidence_error)
+    assert confidence is not None
 
-    objects, objects_error = _normalize_string_list(arguments.get("objects"), "objects")
+    objects, objects_error = normalize_string_list(arguments.get("objects"), "objects")
     if objects_error:
-        return _error_response(objects_error)
+        return error_response(objects_error)
 
-    labels, labels_error = _normalize_string_list(arguments.get("labels"), "labels")
+    labels, labels_error = normalize_string_list(arguments.get("labels"), "labels")
     if labels_error:
-        return _error_response(labels_error)
+        return error_response(labels_error)
 
     input_payload: dict[str, Any] = {
         "name": name,
@@ -112,11 +71,14 @@ async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.Text
         "confidence": confidence,
     }
 
-    published = arguments.get("published")
-    if published is not None:
-        if not isinstance(published, str) or not published.strip():
-            return _error_response("published must be a non-empty ISO date string when provided")
-        input_payload["published"] = published.strip()
+    published_raw = arguments.get("published")
+    published, published_error = normalize_non_empty_string(published_raw, "published")
+    if published_error:
+        return error_response(published_error)
+    if published_raw is not None and published is None:
+        return error_response("published must be a non-empty ISO date string when provided")
+    if published:
+        input_payload["published"] = published
 
     if objects:
         input_payload["objects"] = objects
@@ -129,7 +91,7 @@ async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.Text
             variable_values={"input": input_payload},
         )
     except Exception as error:  # noqa: BLE001
-        return _error_response(str(error))
+        return error_response(str(error))
 
     report_data = result.get("reportAdd", {})
-    return _success_response(report_data)
+    return success_response(report_data)

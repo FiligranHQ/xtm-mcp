@@ -22,6 +22,7 @@ async def test_execute_graphql_query_prefixes_query_when_no_operation(monkeypatc
 
 async def test_execute_graphql_query_accepts_mutation_without_forcing_query(monkeypatch):
     monkeypatch.setattr(execute_graphql_query_tool, "gql", lambda query: query)
+    monkeypatch.setenv("OPENCTI_ENABLE_MUTATIONS", "true")
     session = AsyncMock()
     session.execute.return_value = {"result": {"id": "x"}}
 
@@ -36,6 +37,58 @@ async def test_execute_graphql_query_accepts_mutation_without_forcing_query(monk
     sent_query = session.execute.await_args.args[0]
     assert sent_query.startswith("mutation ")
     assert not sent_query.startswith("query mutation ")
+
+
+async def test_execute_graphql_query_blocks_mutation_when_mutations_disabled(monkeypatch):
+    monkeypatch.setattr(execute_graphql_query_tool, "gql", lambda query: query)
+    monkeypatch.setenv("OPENCTI_ENABLE_MUTATIONS", "false")
+    session = AsyncMock()
+
+    result = await execute_graphql_query_tool.handle(
+        session,
+        {"query": "mutation DoThing { ping }"},
+    )
+
+    payload = json.loads(result[0].text)
+    assert payload["success"] is False
+    assert "disabled" in payload["error"].lower()
+    session.execute.assert_not_called()
+
+
+async def test_execute_graphql_query_keeps_fragment_led_document_untouched(monkeypatch):
+    monkeypatch.setattr(execute_graphql_query_tool, "gql", lambda query: query)
+    session = AsyncMock()
+    session.execute.return_value = {"viewer": {"id": "user--1"}}
+
+    fragment_doc = (
+        "fragment ViewerFields on Query { viewer { id } }\n"
+        "query ViewerQuery { viewer { id } }"
+    )
+    result = await execute_graphql_query_tool.handle(session, {"query": fragment_doc})
+
+    payload = json.loads(result[0].text)
+    assert payload["success"] is True
+    assert session.execute.await_count == 1
+    sent_query = session.execute.await_args.args[0]
+    assert sent_query.startswith("fragment ")
+    assert not sent_query.startswith("query fragment ")
+
+
+async def test_execute_graphql_query_blocks_fragment_led_mutation_when_disabled(monkeypatch):
+    monkeypatch.setattr(execute_graphql_query_tool, "gql", lambda query: query)
+    monkeypatch.setenv("OPENCTI_ENABLE_MUTATIONS", "false")
+    session = AsyncMock()
+
+    fragment_mutation_doc = (
+        "fragment ViewerFields on Query { viewer { id } }\n"
+        "mutation DoThing { ping }"
+    )
+    result = await execute_graphql_query_tool.handle(session, {"query": fragment_mutation_doc})
+
+    payload = json.loads(result[0].text)
+    assert payload["success"] is False
+    assert "disabled" in payload["error"].lower()
+    session.execute.assert_not_called()
 
 
 async def test_execute_graphql_query_returns_json_error_for_invalid_arguments():

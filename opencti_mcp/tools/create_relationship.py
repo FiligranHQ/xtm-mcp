@@ -1,10 +1,15 @@
-import json
 from typing import Any
 
 from gql import gql
 from mcp import types as mcp_types
 
 from opencti_mcp.graphql_queries import CREATE_RELATIONSHIP_MUTATION
+from opencti_mcp.tools.tool_helpers import (
+    ensure_arguments_dict,
+    error_response,
+    normalize_non_empty_string,
+    success_response,
+)
 from opencti_mcp.utils.mutations import mutations_enabled
 
 _MUTATIONS_DISABLED_MESSAGE = (
@@ -13,50 +18,40 @@ _MUTATIONS_DISABLED_MESSAGE = (
 )
 
 
-def _error_response(message: str) -> list[mcp_types.TextContent]:
-    return [
-        mcp_types.TextContent(
-            type="text",
-            text=json.dumps({"success": False, "error": message}, indent=2),
-        )
-    ]
-
-
-def _success_response(data: Any) -> list[mcp_types.TextContent]:
-    return [
-        mcp_types.TextContent(
-            type="text",
-            text=json.dumps({"success": True, "data": data}, indent=2),
-        )
-    ]
-
-
-def _normalize_required_string(value: Any, field_name: str) -> tuple[str | None, str | None]:
-    if not isinstance(value, str) or not value.strip():
-        return None, f"{field_name} is required and must be a non-empty string"
-    return value.strip(), None
-
-
 async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.TextContent]:
     if not mutations_enabled():
-        return _error_response(_MUTATIONS_DISABLED_MESSAGE)
+        return error_response(_MUTATIONS_DISABLED_MESSAGE)
 
-    if not isinstance(arguments, dict):
-        return _error_response(f"arguments must be a dictionary, got {type(arguments)}")
+    args_error = ensure_arguments_dict(arguments)
+    if args_error:
+        return error_response(args_error)
 
-    from_id, from_id_error = _normalize_required_string(arguments.get("fromId"), "fromId")
+    from_id, from_id_error = normalize_non_empty_string(
+        arguments.get("fromId"),
+        "fromId",
+        required=True,
+    )
     if from_id_error:
-        return _error_response(from_id_error)
+        return error_response(from_id_error)
+    assert from_id is not None
 
-    to_id, to_id_error = _normalize_required_string(arguments.get("toId"), "toId")
+    to_id, to_id_error = normalize_non_empty_string(
+        arguments.get("toId"),
+        "toId",
+        required=True,
+    )
     if to_id_error:
-        return _error_response(to_id_error)
+        return error_response(to_id_error)
+    assert to_id is not None
 
-    relationship_type, relationship_type_error = _normalize_required_string(
-        arguments.get("relationship_type"), "relationship_type"
+    relationship_type, relationship_type_error = normalize_non_empty_string(
+        arguments.get("relationship_type"),
+        "relationship_type",
+        required=True,
     )
     if relationship_type_error:
-        return _error_response(relationship_type_error)
+        return error_response(relationship_type_error)
+    assert relationship_type is not None
 
     input_payload = {
         "fromId": from_id,
@@ -70,7 +65,7 @@ async def handle(session: Any, arguments: dict[str, Any]) -> list[mcp_types.Text
             variable_values={"input": input_payload},
         )
     except Exception as error:  # noqa: BLE001
-        return _error_response(str(error))
+        return error_response(str(error))
 
     relationship_data = result.get("stixCoreRelationshipAdd", {})
-    return _success_response(relationship_data)
+    return success_response(relationship_data)

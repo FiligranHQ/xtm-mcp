@@ -153,8 +153,9 @@ Mutation tools:
 | `search_entities_by_name` | Search entities by name and intersect with available entity types |
 
 Notes:
-- `execute_graphql_query` keeps explicit operation prefixes (`query`, `mutation`, `subscription`).
-- If no operation prefix is provided, `execute_graphql_query` prepends `query`.
+- `execute_graphql_query` keeps explicit GraphQL document prefixes unchanged (`query`, `mutation`, `subscription`, `fragment`, etc.).
+- If no document prefix is provided, `execute_graphql_query` prepends `query`.
+- `mutation` operations submitted through `execute_graphql_query` follow the same mutation gate (`--enable-mutations` / `OPENCTI_ENABLE_MUTATIONS=true`) as dedicated write tools.
 - For write operations, use dedicated mutation tools.
 
 ### 2) Brand Posture Read Pack
