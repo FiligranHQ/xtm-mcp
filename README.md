@@ -1,43 +1,122 @@
 # XTM MCP Servers
 
-This repository hosts MCP (Model Context Protocol) servers related to Filigran's XTM Suite. More MCP servers to come!
+This repository hosts MCP (Model Context Protocol) servers for Filigran products.
 
-## Versioning strategy
-This repository follows Semantic Versioning (SemVer) with the version format `X.Y.Z`, where:
-- X (Major): Incremented for significant changes that introduce breaking changes or major new features that are not backward-compatible. 
-- Y (Minor): Incremented for new features or enhancements that are backward-compatible. Example: adding a new MCP server for one of the tools in the XTM suite
-- Z (Patch): Incremented for bug fixes or minor updates that are backward-compatible
-
-Versions are tagged in the format X.Y.Z (e.g., 1.0.0) in the GitHub repository.
-
-## Available servers
+At the moment it includes one server:
 
 | Server | Directory | Description |
-|--------|-----------|-------------|
-| OpenCTI GraphQL MCP | [`opencti_mcp/`](opencti_mcp/README.md) | Interact with an OpenCTI instance via its GraphQL API — introspect the schema, list types, run and validate queries. |
-
-See each server's README for configuration, usage, available tools, and MCP client setup.
+| --- | --- | --- |
+| OpenCTI GraphQL MCP | [`opencti_mcp/`](opencti_mcp/README.md) | Query and mutate OpenCTI from MCP clients (schema discovery, threat intel retrieval, brand posture workflows). |
 
 ## Requirements
 
 - Python 3.10+
-- pip and venv (or your preferred environment manager)
+- `pip` + `venv` (or an equivalent environment manager)
+- OpenCTI instance URL and API token
 
-## Quickstart
+## Quickstart (use the server)
 
-1. Create a virtual environment and install dependencies:
+1. Install dependencies:
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-2. Follow the server-specific README for configuration and usage (e.g. [`opencti_mcp/README.md`](opencti_mcp/README.md)).
+2. Configure credentials:
+
+```bash
+cp .env.example .env
+# edit .env and set:
+# OPENCTI_URL=https://your-opencti
+# OPENCTI_TOKEN=<your-token>
+```
+
+3. Run the MCP server (STDIO):
+
+```bash
+python -m opencti_mcp.server
+```
+
+4. Enable write tools only when needed:
+
+```bash
+python -m opencti_mcp.server --enable-mutations
+```
+
+Note:
+- `--enable-mutations` only affects this MCP server process.
+- It is a local safety guard to avoid exposing write-capable MCP servers by default.
+- It does not change permissions/capabilities on the remote OpenCTI/OEAV instance.
+- The target backend and token permissions must allow mutations, otherwise writes will still fail.
+
+5. Connect from your MCP client. Example config:
+
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "command": "python",
+      "args": ["-m", "opencti_mcp.server"],
+      "env": {
+        "OPENCTI_URL": "https://your-opencti",
+        "OPENCTI_TOKEN": "<token>"
+      }
+    }
+  }
+}
+```
+
+6. Deploy over HTTP when needed.
+
+Streamable HTTP server:
+
+```bash
+python -m opencti_mcp.server \
+  --transport streamable-http \
+  --host 127.0.0.1 \
+  --port 8000
+```
+
+Streamable HTTP MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+SSE server:
+
+```bash
+python -m opencti_mcp.server \
+  --transport sse \
+  --host 127.0.0.1 \
+  --port 8000
+```
+
+SSE MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "url": "http://127.0.0.1:8000/sse"
+    }
+  }
+}
+```
+
+For full transport options and all tools, see [`opencti_mcp/README.md`](opencti_mcp/README.md).
 
 ## Development
 
-Install developer tooling (ruff, black, mypy):
+Install dev dependencies:
 
 ```bash
 pip install -r requirements-dev.txt
@@ -46,15 +125,31 @@ pip install -r requirements-dev.txt
 Run checks:
 
 ```bash
-# Lint
 ruff check .
-
-# Format
 black .
-
-# Type-check
 mypy .
-
-# Run tests
 pytest tests/
 ```
+
+## Contributing
+
+Contributions are welcome, including documentation improvements, bug fixes, and new tools.
+
+1. Create a feature branch from `main`.
+2. Implement changes and tests.
+3. Run `ruff`, `mypy`, and `pytest`.
+4. Open a PR with:
+  - clear problem statement
+  - implementation details
+  - test evidence
+
+Please read:
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+
+## Versioning
+
+The project follows Semantic Versioning (`X.Y.Z`):
+- `X`: breaking changes
+- `Y`: backward-compatible features
+- `Z`: backward-compatible fixes

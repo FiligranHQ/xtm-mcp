@@ -19,7 +19,7 @@ async def test_initialize(test_server):
 
 
 async def test_list_tools_returns_all_expected_names(test_server):
-    """list_tools() returns exactly the 9 registered tools."""
+    """list_tools() returns exactly the registered tools."""
     async with create_connected_server_and_client_session(test_server) as session:
         result = await session.list_tools()
         tool_names = {t.name for t in result.tools}
