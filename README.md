@@ -45,6 +45,12 @@ python -m opencti_mcp.server
 python -m opencti_mcp.server --enable-mutations
 ```
 
+Note:
+- `--enable-mutations` only affects this MCP server process.
+- It is a local safety guard to avoid exposing write-capable MCP servers by default.
+- It does not change permissions/capabilities on the remote OpenCTI/OEAV instance.
+- The target backend and token permissions must allow mutations, otherwise writes will still fail.
+
 5. Connect from your MCP client. Example config:
 
 ```json
@@ -57,6 +63,50 @@ python -m opencti_mcp.server --enable-mutations
         "OPENCTI_URL": "https://your-opencti",
         "OPENCTI_TOKEN": "<token>"
       }
+    }
+  }
+}
+```
+
+6. Deploy over HTTP when needed.
+
+Streamable HTTP server:
+
+```bash
+python -m opencti_mcp.server \
+  --transport streamable-http \
+  --host 127.0.0.1 \
+  --port 8000
+```
+
+Streamable HTTP MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "url": "http://127.0.0.1:8000/mcp"
+    }
+  }
+}
+```
+
+SSE server:
+
+```bash
+python -m opencti_mcp.server \
+  --transport sse \
+  --host 127.0.0.1 \
+  --port 8000
+```
+
+SSE MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "opencti-graphql-mcp": {
+      "url": "http://127.0.0.1:8000/sse"
     }
   }
 }

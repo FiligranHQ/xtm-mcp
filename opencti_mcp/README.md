@@ -124,6 +124,11 @@ To enable them, use:
 - `--enable-mutations`, or
 - `OPENCTI_ENABLE_MUTATIONS=true`
 
+Important:
+- This flag is a local safety guard on the MCP server only. It does not change anything on the target OpenCTI/OEAV instance.
+- Enabling mutations here only allows the MCP server to attempt write operations.
+- The backend instance and token permissions must still allow mutations; otherwise writes will still fail.
+
 Mutation tools:
 - `create_identity`
 - `create_label`
