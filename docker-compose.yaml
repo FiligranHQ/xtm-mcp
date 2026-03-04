@@ -162,11 +162,6 @@ services:
       - opencti
     restart: unless-stopped
 
-  # Chat UI — browse to http://localhost:3000
-  # 1. Login (default: admin / create on first run)
-  # http://localhost:3000/admin/settings/general
-  # 2. Set your LLM: Admin → Settings → Connections → add OpenAI-compatible endpoint + API key
-  # 3. Add MCP server: Admin → Tools → Add MCP Server → URL = http://xtm-mcp:8000/mcp
   open-webui:
     image: ghcr.io/open-webui/open-webui:v0.8.5
     environment:
