@@ -10,6 +10,7 @@ from gql import Client
 from gql.transport.aiohttp import AIOHTTPTransport
 from mcp import types as mcp_types
 from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from opencti_mcp.tools import (
     execute_graphql_query as execute_graphql_query_tool,
@@ -245,6 +246,18 @@ def main() -> None:
     mcp_server.settings.port = args.port
     mcp_server.settings.stateless_http = args.stateless_http
     mcp_server.settings.json_response = args.json_response
+
+    # Disable DNS rebinding protection when not binding to loopback so that
+    # Docker-networked clients (e.g. Open WebUI) using the service hostname
+    # as Host header are not rejected with 421 Misdirected Request.
+    # Indeed FastMCP gets instantiated at module load time with the default host of 
+    # 127.0.0.1, which triggers DNS rebinding protection. 
+    # Then if we change the host later in the code, the security settings 
+    # were already locked in.
+    if args.host not in ("127.0.0.1", "localhost", "::1"):
+        mcp_server.settings.transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=False
+        )
 
     mcp_server.run(transport=args.transport)
 
